@@ -37,40 +37,30 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
       <head>
-        {/*
-         * ============================================================
-         *  NOVUS.AI OBSERVABILITY SCRIPT — INJECT HERE
-         * ============================================================
-         *  1. Sign up / log in at: https://novus.pendo.io
-         *  2. Create a new application in your Novus dashboard.
-         *  3. Copy the generated initialization snippet.
-         *  4. Uncomment the <Script> block below and paste your
-         *     snippet inside dangerouslySetInnerHTML.__html.
-         *
-         *  strategy="afterInteractive" ensures Novus loads after
-         *  React hydration — recommended for Next.js App Router.
-         * ============================================================
-         */}
-
-        {/* <Script
-          id="novus-ai-observability"
+        <Script
+          id="novus-pendo-install"
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
-              // ── PASTE YOUR NOVUS.AI SNIPPET BELOW THIS LINE ──────
-              //
-              // Example (replace with your real API key):
-              // (function(n,o,v,u,s,ai){
-              //   n[s]=n[s]||function(){(n[s].q=n[s].q||[]).push(arguments)};
-              //   var t=document.createElement(o); t.async=1;
-              //   t.src='https://cdn.novus.ai/agent.js?apiKey='+ai;
-              //   document.head.appendChild(t);
-              // })(window,'script',0,0,'novus','YOUR_NOVUS_API_KEY_HERE');
-              //
-              // ─────────────────────────────────────────────────────
+(function(apiKey){
+    (function(p,e,n,d,o){var v,w,x,y,z;o=p[d]=p[d]||{};o._q=o._q||[];
+    v=['initialize','identify','updateOptions','pageLoad','track', 'trackAgent'];for(w=0,x=v.length;w<x;++w)(function(m){
+    o[m]=o[m]||function(){o._q[m===v[0]?'unshift':'push']([m].concat([].slice.call(arguments,0)));};})(v[w]);
+    y=e.createElement(n);y.async=!0;y.src='https://cdn.pendo.io/agent/static/'+apiKey+'/pendo.js';
+    z=e.getElementsByTagName(n)[0];z.parentNode.insertBefore(y,z);})(window,document,'script','pendo');
+})('3ee3d22c-3f1c-4709-ac2f-3e8cb4d31b99');
             `,
           }}
-        /> */}
+        />
+        <Script
+          id="novus-pendo-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              pendo.initialize({ visitor: { id: '' } });
+            `,
+          }}
+        />
       </head>
 
       <body className="min-h-full flex flex-col bg-background text-foreground">
