@@ -6,6 +6,7 @@
 // service-role client. Renders a polished dark-mode SaaS dashboard.
 // =============================================================================
 
+import { pendoTrack } from "@/lib/pendo-track";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { IncomingTicketRow, TicketStatus } from "@/lib/supabase/types";
 import {
@@ -411,6 +412,20 @@ export default async function DashboardPage() {
   ).length;
   const escalated = tickets.filter((t) => t.status === "escalated").length;
   const patchRate = total > 0 ? Math.round((patched / total) * 100) : 0;
+
+  // Pendo: Event 8 — Dashboard data loaded
+  pendoTrack({
+    event: "dashboard_data_loaded",
+    visitorId: "system",
+    properties: {
+      total_tickets: total,
+      patched_count: patched,
+      escalated_count: escalated,
+      in_pipeline_count: inPipeline,
+      auto_patch_rate: patchRate,
+      is_demo_mode: isDemo,
+    },
+  });
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
