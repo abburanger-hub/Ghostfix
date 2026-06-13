@@ -32,6 +32,13 @@ interface IngestPayload {
   user_email: string;
 }
 
+/** Shape of a row returned from the historical_fixes knowledge base */
+interface HistoricalFix {
+  error_signature: string;
+  proposed_solution: string;
+  mock_patch_code: string;
+}
+
 /** What the AI triage function resolves to */
 interface TriageResult {
   /** The module/component the AI identified as the root cause */
@@ -42,6 +49,8 @@ interface TriageResult {
   confidence_score: number;
   /** Whether the AI found a strong enough match to warrant auto-patching */
   auto_patch_viable: boolean;
+  /** True when the answer was grounded in a past team resolution (RAG hit) */
+  matched_historical_fix: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +90,65 @@ function isWebhookAuthorized(request: NextRequest): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// RAG: Fetch historical context from the team knowledge base
+// ---------------------------------------------------------------------------
+
+/**
+ * fetchHistoricalContext
+ *
+ * Queries the historical_fixes table for past resolutions that share keywords
+ * with the incoming issue. Returns up to 3 matches which are injected into the
+ * AI prompt so the model reasons from your team's real documented solutions
+ * first, before falling back to general LLM knowledge.
+ *
+ * No extra DB functions needed — uses ILIKE keyword search across both columns.
+ */
+async function fetchHistoricalContext(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  issue_text: string
+): Promise<HistoricalFix[]> {
+  // Common words that appear in almost every bug report — skip them
+  const STOP_WORDS = new Set([
+    "this", "that", "with", "from", "have", "been", "they", "will",
+    "would", "could", "should", "after", "before", "about", "getting",
+    "showing", "throwing", "every", "even", "though", "very", "just",
+    "still", "when", "then", "also", "both", "each", "more", "some",
+  ]);
+
+  // Extract the 5 most meaningful domain keywords from the issue description
+  const keywords = issue_text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 4 && !STOP_WORDS.has(w))
+    .slice(0, 5);
+
+  if (keywords.length === 0) return [];
+
+  // Build an OR filter searching both columns for any extracted keyword
+  // e.g. "error_signature.ilike.%payment%,proposed_solution.ilike.%payment%"
+  const orFilter = keywords
+    .flatMap((kw) => [
+      `error_signature.ilike.%${kw}%`,
+      `proposed_solution.ilike.%${kw}%`,
+    ])
+    .join(",");
+
+  const { data, error } = await supabase
+    .from("historical_fixes")
+    .select("error_signature, proposed_solution, mock_patch_code")
+    .or(orFilter)
+    .limit(3);
+
+  if (error) {
+    console.warn("[GhostFix] Historical context fetch failed:", error.message);
+    return [];
+  }
+
+  return (data as HistoricalFix[]) ?? [];
+}
+
+// ---------------------------------------------------------------------------
 // Core AI Triage Function
 // ---------------------------------------------------------------------------
 
@@ -96,21 +164,50 @@ function isWebhookAuthorized(request: NextRequest): boolean {
  * @param issue_text  The raw user-submitted bug description
  * @returns           A structured TriageResult, or a safe fallback on error
  */
-async function analyzeTicketWithAI(issue_text: string): Promise<TriageResult> {
+async function analyzeTicketWithAI(
+  issue_text: string,
+  historicalContext: HistoricalFix[] = []
+): Promise<TriageResult> {
   const client = new Groq({
     apiKey: process.env.GROQ_API_KEY,
   });
 
+  // ── Build the RAG context block if historical matches were found ──────────
+  const hasHistory = historicalContext.length > 0;
+  const historyBlock = hasHistory
+    ? historicalContext
+        .map(
+          (fix, i) =>
+            `[Match ${i + 1}]\n` +
+            `Error Pattern : ${fix.error_signature}\n` +
+            `Known Fix     : ${fix.proposed_solution}\n` +
+            `Patch Preview : ${fix.mock_patch_code.slice(0, 300)}`
+        )
+        .join("\n\n")
+    : "";
+
   const systemPrompt = `
 You are an expert SRE (Site Reliability Engineer) assistant and autonomous triage agent.
 Your job is to analyze incoming user bug reports and identify the root cause as precisely as possible.
+${
+  hasHistory
+    ? `
+TEAM KNOWLEDGE BASE — PAST RESOLUTIONS (use as primary evidence, highest priority):
+Your engineering team has already solved similar issues before. Always prefer these documented fixes over general LLM knowledge.
 
+${historyBlock}
+
+When a historical match applies, set confidence_score to 0.95 or above and set matched_historical_fix to true.
+`
+    : ""
+}
 You MUST respond with a valid JSON object and nothing else. Follow this exact schema:
 {
   "failing_module": "<string: the specific software module, service, or component that is broken>",
   "fix_summary": "<string: exactly one sentence describing the most likely fix for the issue>",
   "confidence_score": <number: a float between 0.0 and 1.0 representing your confidence in this diagnosis>,
-  "auto_patch_viable": <boolean: true if the issue is well-understood enough to apply an automated hotfix, false if it needs human investigation>
+  "auto_patch_viable": <boolean: true if the issue is well-understood enough to apply an automated hotfix, false if it needs human investigation>,
+  "matched_historical_fix": <boolean: true ONLY if you used a past resolution from the knowledge base above, false otherwise>
 }
 
 Rules:
@@ -118,6 +215,7 @@ Rules:
 - fix_summary must be one sentence, under 25 words, and actionable.
 - confidence_score above 0.7 means auto_patch_viable should generally be true.
 - If the report is too vague to diagnose, set confidence_score below 0.4 and auto_patch_viable to false.
+- matched_historical_fix must be false when no knowledge base entries were provided.
 `.trim();
 
   const userPrompt = `
@@ -161,6 +259,10 @@ Analyze this report and return the JSON triage result.
         typeof parsed.auto_patch_viable === "boolean"
           ? parsed.auto_patch_viable
           : false,
+      matched_historical_fix:
+        typeof parsed.matched_historical_fix === "boolean"
+          ? parsed.matched_historical_fix
+          : false,
     };
   } catch (err) {
     // If the Groq call fails for any reason, return a safe fallback
@@ -172,6 +274,7 @@ Analyze this report and return the JSON triage result.
         "AI analysis failed — ticket has been escalated to the engineering team.",
       confidence_score: 0,
       auto_patch_viable: false,
+      matched_historical_fix: false,
     };
   }
 }
@@ -254,10 +357,15 @@ export async function POST(request: NextRequest) {
     .update({ status: "analyzing" satisfies TicketStatus })
     .eq("id", ticketId);
 
-  // ── 4. Run AI triage ──────────────────────────────────────────────────────
-  const triage = await analyzeTicketWithAI(issue_text.trim());
+  // ── 4. Fetch historical context from knowledge base (RAG) ────────────────
+  //  Query historical_fixes for past resolutions that match this issue's
+  //  keywords — these are injected into the AI prompt as grounding evidence.
+  const historicalContext = await fetchHistoricalContext(supabase, issue_text.trim());
 
-  // ── 5. Determine final status + ghost link ───────────────────────────────
+  // ── 5. Run AI triage — grounded in team knowledge base when matches found ─
+  const triage = await analyzeTicketWithAI(issue_text.trim(), historicalContext);
+
+  // ── 6. Determine final status + ghost link ───────────────────────────────
   //
   //  auto_patch_viable = true  → we "deploy" a ghost environment
   //                              (simulated: generate unique URL + set 'patched')
@@ -292,6 +400,8 @@ export async function POST(request: NextRequest) {
         failing_module: triage.failing_module,
         fix_summary: triage.fix_summary,
         confidence_score: triage.confidence_score,
+        matched_historical_fix: triage.matched_historical_fix,
+        historical_matches_found: historicalContext.length,
       },
       ghost_environment: ghostLink
         ? {
