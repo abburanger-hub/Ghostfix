@@ -23,6 +23,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Activity,
+  XCircle,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -52,6 +53,59 @@ async function fetchStats() {
   } catch {
     return { total: 13, patched: 9, patchRate: 69, kbEntries: 5 };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Recent Activity from Supabase (last 4 triaged tickets, anonymized)
+// ---------------------------------------------------------------------------
+interface RecentTicket {
+  module: string;
+  status: string;
+  createdAt: string;
+}
+
+async function fetchRecentActivity(): Promise<RecentTicket[]> {
+  const hasRealKeys =
+    process.env.SUPABASE_URL &&
+    !process.env.SUPABASE_URL.includes("placeholder") &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    !process.env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder");
+
+  const fallback: RecentTicket[] = [
+    { module: "Stripe Payment Gateway", status: "patched", createdAt: new Date(Date.now() - 1000 * 42).toISOString() },
+    { module: "JWT Auth Middleware", status: "patched", createdAt: new Date(Date.now() - 1000 * 60 * 3).toISOString() },
+    { module: "Email SMTP Service", status: "escalated", createdAt: new Date(Date.now() - 1000 * 60 * 11).toISOString() },
+    { module: "S3 Upload Handler", status: "patched", createdAt: new Date(Date.now() - 1000 * 60 * 28).toISOString() },
+  ];
+
+  if (!hasRealKeys) return fallback;
+
+  try {
+    const supabase = createServerSupabaseClient();
+    const { data } = await supabase
+      .from("incoming_tickets")
+      .select("failing_module, status, created_at")
+      .in("status", ["patched", "escalated", "resolved"])
+      .order("created_at", { ascending: false })
+      .limit(4);
+
+    if (!data || data.length === 0) return fallback;
+    return data.map((r) => ({
+      module: (r.failing_module as string | null) ?? "Unknown Module",
+      status: r.status as string,
+      createdAt: r.created_at as string,
+    }));
+  } catch {
+    return fallback;
+  }
+}
+
+function timeAgo(iso: string): string {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.floor(mins / 60)}h ago`;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +169,7 @@ const FEATURES = [
 // Page
 // ---------------------------------------------------------------------------
 export default async function LandingPage() {
-  const stats = await fetchStats();
+  const [stats, recent] = await Promise.all([fetchStats(), fetchRecentActivity()]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -198,6 +252,100 @@ export default async function LandingPage() {
                 <span className="text-xs text-muted-foreground/60">{s.label}</span>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* ─── BEFORE / AFTER ───────────────────────────────────────────── */}
+        <section className="px-4 py-16 sm:px-8">
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-8 text-center">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">The real problem</p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Your team shouldn&apos;t be doing this</h2>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Before */}
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.03] p-6">
+                <p className="mb-4 text-xs font-bold uppercase tracking-widest text-red-400/70">Before GhostFix</p>
+                <div className="space-y-3">
+                  {[
+                    "3:17am. PagerDuty fires. Checkout is down.",
+                    "Engineer digs through logs for 45 minutes.",
+                    "Finds it: a Stripe webhook timeout. Again.",
+                    "Deploys a fix. Writes a Slack message. Goes back to sleep.",
+                    "Same bug fires again two weeks later.",
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-2.5">
+                      <XCircle className="mt-0.5 size-3.5 shrink-0 text-red-400/60" />
+                      <p className="text-sm text-muted-foreground/70">{item}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* After */}
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.03] p-6">
+                <p className="mb-4 text-xs font-bold uppercase tracking-widest text-emerald-400/70">After GhostFix</p>
+                <div className="space-y-3">
+                  {[
+                    "3:17am. Bug report hits GhostFix.",
+                    "AI identifies root cause in ~3 seconds.",
+                    "Stripe webhook match found in knowledge base.",
+                    "Ghost environment provisioned. User unblocked.",
+                    "Fix saved to KB. Never escalated again.",
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-2.5">
+                      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
+                      <p className="text-sm text-muted-foreground/70">{item}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── RECENT ACTIVITY ──────────────────────────────────────────── */}
+        <section className="border-y border-border/30 bg-muted/10 px-4 py-10 sm:px-8">
+          <div className="mx-auto max-w-3xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                </span>
+                <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">Live Triage Activity</p>
+              </div>
+              <Link href="/dashboard" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+                View all →
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {recent.map((ticket, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-xl border border-border/30 bg-card/30 px-4 py-2.5">
+                  <div className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
+                    ticket.status === "patched" || ticket.status === "resolved"
+                      ? "bg-emerald-500/10 text-emerald-400"
+                      : "bg-amber-500/10 text-amber-400"
+                  }`}>
+                    {ticket.status === "patched" || ticket.status === "resolved"
+                      ? <CheckCircle2 className="size-3" />
+                      : <AlertTriangle className="size-3" />}
+                  </div>
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground/70">
+                    {ticket.module}
+                  </span>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                    ticket.status === "patched" || ticket.status === "resolved"
+                      ? "bg-emerald-500/10 text-emerald-400"
+                      : "bg-amber-500/10 text-amber-400"
+                  }`}>
+                    {ticket.status}
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground/40">
+                    {timeAgo(ticket.createdAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

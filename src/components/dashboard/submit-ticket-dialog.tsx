@@ -7,6 +7,7 @@
 
 import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -364,9 +365,13 @@ function ResultCard({
         >
           Submit another
         </Button>
-        <Button size="sm" className="flex-1 text-xs" onClick={onClose}>
-          View in dashboard
-        </Button>
+        <Link
+          href={`/dashboard?highlight=${result.ticket_id}`}
+          onClick={onClose}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-500/20 transition-all hover:from-indigo-500 hover:to-violet-500"
+        >
+          See it in dashboard →
+        </Link>
       </div>
     </div>
   );

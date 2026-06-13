@@ -391,9 +391,9 @@ const PAGE_SIZE = 10;
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; highlight?: string }>;
 }) {
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, highlight } = await searchParams;
   const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   // ── Fetch tickets ─────────────────────────────────────────────────────────
@@ -680,13 +680,28 @@ export default async function DashboardPage({
                   {tickets.map((ticket) => {
                     const cfg =
                       STATUS_CONFIG[ticket.status] ?? STATUS_CONFIG.pending;
+                    const isHighlighted = ticket.id === highlight;
                     return (
                       <TableRow
                         key={ticket.id}
-                        className={`group border-b-border/30 border-l-2 transition-colors hover:bg-white/[0.02] ${cfg.rowBorderCls}`}
+                        id={isHighlighted ? "highlighted-ticket" : undefined}
+                        className={`group border-b-border/30 border-l-2 transition-colors hover:bg-white/[0.02] ${cfg.rowBorderCls} ${
+                          isHighlighted
+                            ? "bg-indigo-500/[0.07] ring-1 ring-inset ring-indigo-500/30 animate-in fade-in-0 duration-700"
+                            : ""
+                        }`}
                       >
                         {/* Time */}
                         <TableCell className="pl-6 font-mono text-[11px] text-muted-foreground/60 tabular-nums">
+                          {isHighlighted && (
+                            <span className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-indigo-400">
+                              <span className="relative flex size-1.5">
+                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+                                <span className="relative inline-flex size-1.5 rounded-full bg-indigo-500" />
+                              </span>
+                              Just triaged
+                            </span>
+                          )}
                           {formatTimeAgo(ticket.created_at)}
                         </TableCell>
 
