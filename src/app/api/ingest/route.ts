@@ -17,6 +17,7 @@ import Groq from "groq-sdk";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { IncomingTicketRow, TicketSource, TicketStatus } from "@/lib/supabase/types";
 import { randomBytes } from "crypto";
+import { pendoTrack } from "@/lib/pendo-track";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -268,6 +269,15 @@ Analyze this report and return the JSON triage result.
     // If the Groq call fails for any reason, return a safe fallback
     // so the rest of the pipeline still completes and the ticket is saved.
     console.error("[GhostFix] analyzeTicketWithAI error:", err);
+    // Pendo: ai_triage_failed — Groq call or JSON parse error
+    void pendoTrack({
+      event: "ai_triage_failed",
+      visitorId: "system",
+      properties: {
+        error_type: err instanceof Error ? err.name : "Unknown",
+        error_message: String(err instanceof Error ? err.message : err).substring(0, 200),
+      },
+    });
     return {
       failing_module: "AI Triage Unavailable",
       fix_summary:
@@ -286,6 +296,14 @@ Analyze this report and return the JSON triage result.
 export async function POST(request: NextRequest) {
   // ── 1. Webhook authorization ─────────────────────────────────────────────
   if (!isWebhookAuthorized(request)) {
+    void pendoTrack({
+      event: "webhook_authorization_failed",
+      visitorId: "system",
+      properties: {
+        has_secret_header: !!request.headers.get("x-ghostfix-secret"),
+        request_path: "/api/ingest",
+      },
+    });
     return NextResponse.json(
       { error: "Unauthorized: invalid or missing x-ghostfix-secret header." },
       { status: 401 }
@@ -306,6 +324,11 @@ export async function POST(request: NextRequest) {
   const { issue_text, source, user_email } = payload;
 
   if (!issue_text || typeof issue_text !== "string" || !issue_text.trim()) {
+    void pendoTrack({
+      event: "ticket_ingestion_failed",
+      visitorId: "system",
+      properties: { error_reason: "missing_issue_text", source: String(source ?? "unknown"), http_status_code: 400 },
+    });
     return NextResponse.json(
       { error: "Missing required field: issue_text must be a non-empty string." },
       { status: 400 }
@@ -314,12 +337,22 @@ export async function POST(request: NextRequest) {
   // source is free-text — "Web Form", "API", "Slack", "Email", etc.
   // Only require it to be a non-empty string.
   if (!source || typeof source !== "string" || !source.trim()) {
+    void pendoTrack({
+      event: "ticket_ingestion_failed",
+      visitorId: "system",
+      properties: { error_reason: "missing_source", source: "unknown", http_status_code: 400 },
+    });
     return NextResponse.json(
       { error: "Missing required field: source must be a non-empty string (e.g. 'Web Form', 'API')." },
       { status: 400 }
     );
   }
   if (!user_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user_email)) {
+    void pendoTrack({
+      event: "ticket_ingestion_failed",
+      visitorId: "system",
+      properties: { error_reason: "invalid_user_email", source: String(source), http_status_code: 400 },
+    });
     return NextResponse.json(
       { error: "Missing or invalid field: user_email must be a valid email address." },
       { status: 400 }
@@ -343,6 +376,11 @@ export async function POST(request: NextRequest) {
 
   if (insertError || !newTicket) {
     console.error("[GhostFix] Supabase insert error:", insertError);
+    void pendoTrack({
+      event: "ticket_ingestion_failed",
+      visitorId: user_email,
+      properties: { error_reason: "database_insert_failed", source: source as string, http_status_code: 500 },
+    });
     return NextResponse.json(
       { error: "Failed to persist ticket to database.", detail: insertError?.message },
       { status: 500 }
@@ -350,6 +388,17 @@ export async function POST(request: NextRequest) {
   }
 
   const ticketId = (newTicket as IncomingTicketRow).id;
+
+  // Pendo: ticket_ingested — ticket successfully saved to Supabase
+  void pendoTrack({
+    event: "ticket_ingested",
+    visitorId: user_email,
+    properties: {
+      ticket_id: ticketId,
+      source: source as string,
+      issue_text_length: issue_text.trim().length,
+    },
+  });
 
   // Mark as 'analyzing' so the dashboard shows triage is in progress
   await supabase
@@ -365,6 +414,21 @@ export async function POST(request: NextRequest) {
   // ── 5. Run AI triage — grounded in team knowledge base when matches found ─
   const triage = await analyzeTicketWithAI(issue_text.trim(), historicalContext);
 
+  // Pendo: ai_triage_completed — AI returned a result (or safe fallback)
+  void pendoTrack({
+    event: "ai_triage_completed",
+    visitorId: user_email,
+    properties: {
+      ticket_id: ticketId,
+      failing_module: triage.failing_module,
+      confidence_score: triage.confidence_score,
+      auto_patch_viable: triage.auto_patch_viable,
+      matched_historical_fix: triage.matched_historical_fix,
+      historical_matches_found: historicalContext.length,
+      source: source as string,
+    },
+  });
+
   // ── 6. Determine final status + ghost link ───────────────────────────────
   //
   //  auto_patch_viable = true  → we "deploy" a ghost environment
@@ -373,6 +437,32 @@ export async function POST(request: NextRequest) {
   //
   const ghostLink = triage.auto_patch_viable ? generateGhostLink() : null;
   const finalStatus = triage.auto_patch_viable ? "patched" : "escalated";
+
+  // Pendo: ghost_environment_provisioned or ticket_escalated
+  if (triage.auto_patch_viable && ghostLink) {
+    void pendoTrack({
+      event: "ghost_environment_provisioned",
+      visitorId: user_email,
+      properties: {
+        ticket_id: ticketId,
+        failing_module: triage.failing_module,
+        confidence_score: triage.confidence_score,
+        matched_historical_fix: triage.matched_historical_fix,
+        source: source as string,
+      },
+    });
+  } else {
+    void pendoTrack({
+      event: "ticket_escalated",
+      visitorId: user_email,
+      properties: {
+        ticket_id: ticketId,
+        failing_module: triage.failing_module,
+        confidence_score: triage.confidence_score,
+        source: source as string,
+      },
+    });
+  }
 
   // ── 6. Update the ticket row with AI results + ghost link ────────────────
   const { error: updateError } = await supabase
