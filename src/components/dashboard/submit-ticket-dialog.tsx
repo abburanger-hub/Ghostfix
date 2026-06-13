@@ -375,7 +375,11 @@ function ResultCard({
 // ---------------------------------------------------------------------------
 // Main Dialog Component
 // ---------------------------------------------------------------------------
-export default function SubmitTicketDialog() {
+export default function SubmitTicketDialog({
+  variant = "header",
+}: {
+  variant?: "header" | "hero";
+}) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -471,17 +475,28 @@ export default function SubmitTicketDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogTrigger
-        render={
-          <Button
-            size="sm"
-            className="gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-500 hover:to-violet-500 border-0"
-          >
-            <Plus className="size-3.5" />
-            New Ticket
-          </Button>
-        }
-      />
+      {variant === "hero" ? (
+        <DialogTrigger
+          render={
+            <button className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-8 text-base font-semibold text-white shadow-xl shadow-indigo-500/30 transition-all hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-500/40 hover:-translate-y-0.5">
+              <Zap className="size-4" />
+              Try GhostFix Live
+            </button>
+          }
+        />
+      ) : (
+        <DialogTrigger
+          render={
+            <Button
+              size="sm"
+              className="gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-500 hover:to-violet-500 border-0"
+            >
+              <Plus className="size-3.5" />
+              New Ticket
+            </Button>
+          }
+        />
+      )}
 
       <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-xl border-border/50 bg-card/95 backdrop-blur-xl p-0 gap-0 overflow-visible">
         {/* ── Header ── */}
