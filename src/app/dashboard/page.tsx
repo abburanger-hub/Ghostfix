@@ -32,6 +32,7 @@ import {
 import RefreshButton from "@/components/dashboard/refresh-button";
 import SubmitTicketDialog from "@/components/dashboard/submit-ticket-dialog";
 import PendoDashboardTracker from "@/components/dashboard/pendo-tracker";
+import ScrollToHighlight from "@/components/dashboard/scroll-to-highlight";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -399,6 +400,9 @@ export default async function DashboardPage({
   // ── Fetch tickets ─────────────────────────────────────────────────────────
   let tickets: IncomingTicketRow[] = [];
   let totalCount = 0;
+  let statPatched = 0;
+  let statPipeline = 0;
+  let statEscalated = 0;
   let fetchError = false;
   let isDemo = false;
 
@@ -411,17 +415,31 @@ export default async function DashboardPage({
   if (!hasRealKeys) {
     // No real Supabase keys — show demo data so the UI is fully visible
     tickets = DEMO_TICKETS;
-    totalCount = DEMO_TICKETS.length;
+    totalCount    = DEMO_TICKETS.length;
+    statPatched   = DEMO_TICKETS.filter(t => t.status === "patched" || t.status === "resolved").length;
+    statPipeline  = DEMO_TICKETS.filter(t => t.status === "pending"  || t.status === "analyzing").length;
+    statEscalated = DEMO_TICKETS.filter(t => t.status === "escalated").length;
     isDemo = true;
   } else {
     try {
       const supabase = createServerSupabaseClient();
 
-      // First get total count for pagination
-      const { count } = await supabase
-        .from("incoming_tickets")
-        .select("*", { count: "exact", head: true });
-      totalCount = count ?? 0;
+      // Run all 4 count queries in parallel for accurate stats across ALL pages
+      const [
+        { count: allCount },
+        { count: patchedCount },
+        { count: pipelineCount },
+        { count: escalatedCount },
+      ] = await Promise.all([
+        supabase.from("incoming_tickets").select("*", { count: "exact", head: true }),
+        supabase.from("incoming_tickets").select("*", { count: "exact", head: true }).in("status", ["patched", "resolved"]),
+        supabase.from("incoming_tickets").select("*", { count: "exact", head: true }).in("status", ["pending", "analyzing"]),
+        supabase.from("incoming_tickets").select("*", { count: "exact", head: true }).eq("status", "escalated"),
+      ]);
+      totalCount   = allCount     ?? 0;
+      statPatched  = patchedCount  ?? 0;
+      statPipeline = pipelineCount ?? 0;
+      statEscalated = escalatedCount ?? 0;
 
       // Then fetch just this page
       const from = (currentPage - 1) * PAGE_SIZE;
@@ -442,15 +460,11 @@ export default async function DashboardPage({
     }
   }
 
-  // ── Compute stats (always from full count, not just current page) ─────────
-  const total = isDemo ? DEMO_TICKETS.length : totalCount;
-  const patched = tickets.filter(
-    (t) => t.status === "patched" || t.status === "resolved"
-  ).length;
-  const inPipeline = tickets.filter(
-    (t) => t.status === "pending" || t.status === "analyzing"
-  ).length;
-  const escalated = tickets.filter((t) => t.status === "escalated").length;
+  // ── Compute stats (from full DB counts, not just current page) ───────────
+  const total    = isDemo ? DEMO_TICKETS.length : totalCount;
+  const patched  = isDemo ? statPatched  : statPatched;
+  const inPipeline = isDemo ? statPipeline : statPipeline;
+  const escalated  = isDemo ? statEscalated : statEscalated;
   const patchRate = total > 0 ? Math.round((patched / total) * 100) : 0;
 
   // ── Pagination ────────────────────────────────────────────────────────────
@@ -472,6 +486,8 @@ export default async function DashboardPage({
         patchRate={patchRate}
         isDemo={isDemo}
       />
+      {/* Scroll new ticket into view if navigated from the submit dialog */}
+      <ScrollToHighlight ticketId={highlight} />
 
       {/* ═══ TOP NAV BAR ═══════════════════════════════════════════════════ */}
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/70 backdrop-blur-xl">

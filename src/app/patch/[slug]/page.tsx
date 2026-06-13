@@ -239,21 +239,22 @@ export default async function PatchPage({
                   </span>
                   <span className="text-zinc-500">{"@@ -12,7 +12,10 @@\n"}</span>
                   <span className="text-red-400/80">
-                    {
-                      "- // Previous configuration causing the issue\n- const config = { timeout: 2000, retries: 1 };\n"
-                    }
+                    {"- // Previous configuration\n- const config = getDefaultConfig();\n"}
                   </span>
                   <span className="text-emerald-400">
-                    {
-                      "+ // GhostFix automated patch — applied " +
-                        new Date().toISOString().split("T")[0] +
-                        "\n"
-                    }
+                    {"+ // GhostFix patch · " + new Date().toISOString().split("T")[0] + "\n"}
                   </span>
                   <span className="text-emerald-400">
-                    {
-                      "+ const config = { timeout: 5000, retries: 3,\n+   onError: (err) => logger.error('[ghostfix]', err) };\n"
-                    }
+                    {"+ // Fix: " +
+                      (ticket?.triage_summary ?? "Apply recommended configuration fix")
+                        .replace(/[\r\n]+/g, " ")
+                        .slice(0, 80) +
+                      "\n"}
+                  </span>
+                  <span className="text-emerald-400">
+                    {"+ const config = getPatchedConfig({ module: '" +
+                      (ticket?.failing_module ?? "core") +
+                      "' });\n"}
                   </span>
                   <span className="text-zinc-600">
                     {"  \n  export default config;\n"}
@@ -295,9 +296,14 @@ export default async function PatchPage({
 
             {/* Live metrics */}
             <div className="rounded-2xl border border-border/40 bg-card/40 p-5 space-y-4">
-              <p className="text-xs font-medium text-foreground/70">
-                Live Metrics
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-foreground/70">
+                  Environment Metrics
+                </p>
+                <span className="rounded-full border border-border/30 bg-muted/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/40">
+                  Simulated
+                </span>
+              </div>
               {[
                 { label: "CPU Usage",       value: `${cpuUsage}%`,          color: "text-blue-400" },
                 { label: "Memory",          value: `${memUsage} MB`,         color: "text-violet-400" },
