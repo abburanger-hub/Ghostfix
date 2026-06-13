@@ -2,13 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Loader2, AlertTriangle, Sparkles, BookOpen } from "lucide-react";
 
-export default function ResolveButton({ ticketId }: { ticketId: string }) {
+interface ResolveButtonProps {
+  ticketId: string;
+  issueText: string;
+  failingModule: string | null;
+}
+
+export default function ResolveButton({ ticketId, issueText, failingModule }: ResolveButtonProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
+  const [saveToKb, setSaveToKb] = useState(false);
+  const [savedToKb, setSavedToKb] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   async function handleResolve() {
@@ -21,12 +29,16 @@ export default function ResolveButton({ ticketId }: { ticketId: string }) {
         body: JSON.stringify({
           ticket_id: ticketId,
           ...(note.trim() ? { engineer_note: note.trim() } : {}),
+          ...(saveToKb && note.trim()
+            ? { save_to_kb: true, issue_text: issueText, failing_module: failingModule }
+            : {}),
         }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
+      setSavedToKb(saveToKb && !!note.trim());
       setStatus("done");
       // Refresh the page to show the resolved state
       setTimeout(() => router.refresh(), 800);
@@ -38,12 +50,25 @@ export default function ResolveButton({ ticketId }: { ticketId: string }) {
 
   if (status === "done") {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 px-5 py-4 animate-in fade-in-0 zoom-in-95 duration-300">
-        <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
-        <div>
-          <p className="text-sm font-semibold text-emerald-300">Marked as Resolved</p>
-          <p className="text-xs text-emerald-400/60">Updating dashboard…</p>
+      <div className="space-y-2 animate-in fade-in-0 zoom-in-95 duration-300">
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 px-5 py-4">
+          <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-300">Marked as Resolved</p>
+            <p className="text-xs text-emerald-400/60">Updating dashboard…</p>
+          </div>
         </div>
+        {savedToKb && (
+          <div className="flex items-center gap-3 rounded-2xl border border-violet-500/25 bg-violet-500/8 px-5 py-3">
+            <Sparkles className="size-4 shrink-0 text-violet-400" />
+            <div>
+              <p className="text-xs font-semibold text-violet-300">Saved to Knowledge Base</p>
+              <p className="text-[11px] text-violet-400/60">
+                GhostFix will use this fix for similar tickets automatically.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -74,6 +99,22 @@ export default function ResolveButton({ ticketId }: { ticketId: string }) {
               placeholder="e.g. Rolled back the config change in PR #481…"
               className="w-full resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
             />
+            {/* Save to KB toggle — only shown when a note has been written */}
+            {note.trim().length > 10 && (
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-violet-500/20 bg-violet-500/5 px-3 py-2.5 transition-colors hover:bg-violet-500/10">
+                <input
+                  type="checkbox"
+                  checked={saveToKb}
+                  onChange={(e) => setSaveToKb(e.target.checked)}
+                  className="size-3.5 cursor-pointer accent-violet-500"
+                />
+                <BookOpen className="size-3.5 shrink-0 text-violet-400" />
+                <div>
+                  <p className="text-[11px] font-semibold text-violet-300">Save fix to knowledge base</p>
+                  <p className="text-[10px] text-violet-400/60">GhostFix will use this for similar tickets in the future.</p>
+                </div>
+              </label>
+            )}
           </div>
         )}
 

@@ -375,7 +375,11 @@ export default async function EscalatePage({
 
             {/* Mark as Resolved */}
             {!isResolved && ticket && (
-              <ResolveButton ticketId={ticket.id} />
+              <ResolveButton
+                ticketId={ticket.id}
+                issueText={ticket.issue_text}
+                failingModule={ticket.failing_module ?? null}
+              />
             )}
 
             {/* Already resolved */}
