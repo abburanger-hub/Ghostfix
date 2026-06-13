@@ -6,6 +6,12 @@
 // service-role client. Renders a polished dark-mode SaaS dashboard.
 // =============================================================================
 
+// Force this route to always render dynamically (never cache at build time)
+// Without this, Next.js will statically generate the page at deploy time and
+// serve the same stale snapshot on every subsequent request.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { IncomingTicketRow, TicketStatus } from "@/lib/supabase/types";
 import {

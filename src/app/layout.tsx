@@ -57,7 +57,19 @@ export default function RootLayout({
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
-              pendo.initialize({ visitor: { id: '' } });
+(function() {
+  // Use a stable anonymous ID so Pendo counts unique visitors correctly.
+  // We store the ID in localStorage so repeat visits are recognized.
+  var visitorId = (typeof localStorage !== 'undefined' && localStorage.getItem('gf_visitor_id'));
+  if (!visitorId) {
+    visitorId = 'anon-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem('gf_visitor_id', visitorId); } catch(e) {}
+  }
+  pendo.initialize({
+    visitor:  { id: visitorId, app: 'ghostfix-dashboard' },
+    account:  { id: 'ghostfix-app' }
+  });
+})();
             `,
           }}
         />
