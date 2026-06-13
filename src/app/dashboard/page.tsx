@@ -31,6 +31,11 @@ import {
 } from "@/components/ui/table";
 import RefreshButton from "@/components/dashboard/refresh-button";
 import SubmitTicketDialog from "@/components/dashboard/submit-ticket-dialog";
+import Link from "next/link";
+import {
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import {
   ExternalLink,
   Ghost,
@@ -377,9 +382,19 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
 // ---------------------------------------------------------------------------
 // Page — Server Component
 // ---------------------------------------------------------------------------
-export default async function DashboardPage() {
+const PAGE_SIZE = 10;
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+
   // ── Fetch tickets ─────────────────────────────────────────────────────────
   let tickets: IncomingTicketRow[] = [];
+  let totalCount = 0;
   let fetchError = false;
   let isDemo = false;
 
@@ -392,14 +407,26 @@ export default async function DashboardPage() {
   if (!hasRealKeys) {
     // No real Supabase keys — show demo data so the UI is fully visible
     tickets = DEMO_TICKETS;
+    totalCount = DEMO_TICKETS.length;
     isDemo = true;
   } else {
     try {
       const supabase = createServerSupabaseClient();
+
+      // First get total count for pagination
+      const { count } = await supabase
+        .from("incoming_tickets")
+        .select("*", { count: "exact", head: true });
+      totalCount = count ?? 0;
+
+      // Then fetch just this page
+      const from = (currentPage - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
       const { data, error } = await supabase
         .from("incoming_tickets")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (error) {
         fetchError = true;
@@ -411,8 +438,8 @@ export default async function DashboardPage() {
     }
   }
 
-  // ── Compute stats ─────────────────────────────────────────────────────────
-  const total = tickets.length;
+  // ── Compute stats (always from full count, not just current page) ─────────
+  const total = isDemo ? DEMO_TICKETS.length : totalCount;
   const patched = tickets.filter(
     (t) => t.status === "patched" || t.status === "resolved"
   ).length;
@@ -421,6 +448,13 @@ export default async function DashboardPage() {
   ).length;
   const escalated = tickets.filter((t) => t.status === "escalated").length;
   const patchRate = total > 0 ? Math.round((patched / total) * 100) : 0;
+
+  // ── Pagination ────────────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasPrev = currentPage > 1;
+  const hasNext = currentPage < totalPages;
+  const pageStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(currentPage * PAGE_SIZE, total);
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -491,7 +525,7 @@ export default async function DashboardPage() {
             </h1>
             {total > 0 && (
               <span className="mb-0.5 text-sm text-muted-foreground">
-                {total} ticket{total !== 1 ? "s" : ""}
+                {total} ticket{total !== 1 ? "s" : ""} total
               </span>
             )}
           </div>
@@ -704,6 +738,68 @@ export default async function DashboardPage() {
                   })}
                 </TableBody>
               </Table>
+            )}
+
+            {/* ── Pagination bar ─────────────────────────────────────── */}
+            {!fetchError && tickets.length > 0 && (
+              <div className="flex items-center justify-between border-t border-border/40 px-6 py-3">
+                {/* Page info */}
+                <p className="text-xs text-muted-foreground/60">
+                  Showing{" "}
+                  <span className="font-medium text-foreground/70">
+                    {pageStart}–{pageEnd}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-medium text-foreground/70">{total}</span>{" "}
+                  ticket{total !== 1 ? "s" : ""}
+                </p>
+
+                {/* Prev / Page indicator / Next */}
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href={`/dashboard?page=${currentPage - 1}`}
+                    aria-disabled={!hasPrev}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      hasPrev
+                        ? "border-border/50 text-foreground/70 hover:border-border hover:bg-muted/30 hover:text-foreground"
+                        : "pointer-events-none border-border/20 text-muted-foreground/25"
+                    }`}
+                  >
+                    <ChevronLeft className="size-3" />
+                    Prev
+                  </Link>
+
+                  {/* Page pills */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                      <Link
+                        key={p}
+                        href={`/dashboard?page=${p}`}
+                        className={`inline-flex size-7 items-center justify-center rounded-lg text-xs font-medium transition-colors ${
+                          p === currentPage
+                            ? "bg-indigo-500/20 border border-indigo-500/40 text-indigo-300"
+                            : "border border-transparent text-muted-foreground/50 hover:border-border/40 hover:text-foreground/70"
+                        }`}
+                      >
+                        {p}
+                      </Link>
+                    ))}
+                  </div>
+
+                  <Link
+                    href={`/dashboard?page=${currentPage + 1}`}
+                    aria-disabled={!hasNext}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      hasNext
+                        ? "border-border/50 text-foreground/70 hover:border-border hover:bg-muted/30 hover:text-foreground"
+                        : "pointer-events-none border-border/20 text-muted-foreground/25"
+                    }`}
+                  >
+                    Next
+                    <ChevronRight className="size-3" />
+                  </Link>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
