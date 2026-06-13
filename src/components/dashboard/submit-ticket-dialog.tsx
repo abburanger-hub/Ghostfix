@@ -279,60 +279,57 @@ function ResultCard({
           </div>
         </div>
 
-        {/* Confidence + RAG row */}
-        <div className="flex items-center gap-4 px-4 py-3">
-          <div className="flex-1">
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50">
-              AI Confidence
-            </p>
-            <div className="mt-1.5 flex items-center gap-2">
-              {/* Progress bar */}
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/40">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    conf >= 80
-                      ? "bg-emerald-500"
-                      : conf >= 50
-                      ? "bg-amber-500"
-                      : "bg-red-500"
-                  }`}
-                  style={{ width: `${conf}%` }}
-                />
-              </div>
-              <span
-                className={`text-xs font-bold tabular-nums ${
+        {/* Confidence row */}
+        <div className="px-4 py-3">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50">
+            AI Confidence
+          </p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/40">
+              <div
+                className={`h-full rounded-full transition-all ${
                   conf >= 80
-                    ? "text-emerald-400"
+                    ? "bg-emerald-500"
                     : conf >= 50
-                    ? "text-amber-400"
-                    : "text-red-400"
+                    ? "bg-amber-500"
+                    : "bg-red-500"
                 }`}
-              >
-                {conf}%
-              </span>
+                style={{ width: `${conf}%` }}
+              />
             </div>
+            <span
+              className={`shrink-0 text-xs font-bold tabular-nums ${
+                conf >= 80
+                  ? "text-emerald-400"
+                  : conf >= 50
+                  ? "text-amber-400"
+                  : "text-red-400"
+              }`}
+            >
+              {conf}%
+            </span>
           </div>
+        </div>
 
-          {/* RAG indicator */}
-          <div className="shrink-0 text-right">
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50">
-              Knowledge Base
-            </p>
-            <div className="mt-0.5 flex items-center justify-end gap-1">
-              {result.triage.matched_historical_fix ? (
-                <>
-                  <Sparkles className="size-3 text-violet-400" />
-                  <span className="text-[11px] font-medium text-violet-400">
-                    {result.triage.historical_matches_found} match
-                    {result.triage.historical_matches_found !== 1 ? "es" : ""} used
-                  </span>
-                </>
-              ) : (
-                <span className="text-[11px] text-muted-foreground/40">
-                  No prior matches
+        {/* RAG knowledge base row */}
+        <div className="flex items-center gap-2 px-4 py-3">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 shrink-0">
+            Knowledge Base
+          </p>
+          <div className="flex items-center gap-1 ml-auto">
+            {result.triage.matched_historical_fix ? (
+              <>
+                <Sparkles className="size-3 shrink-0 text-violet-400" />
+                <span className="text-[11px] font-medium text-violet-400 whitespace-nowrap">
+                  {result.triage.historical_matches_found} historical match
+                  {result.triage.historical_matches_found !== 1 ? "es" : ""} used
                 </span>
-              )}
-            </div>
+              </>
+            ) : (
+              <span className="text-[11px] text-muted-foreground/40">
+                No prior matches — general AI knowledge used
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -486,7 +483,7 @@ export default function SubmitTicketDialog() {
         }
       />
 
-      <DialogContent className="max-w-lg border-border/50 bg-card/95 backdrop-blur-xl p-0 gap-0 overflow-hidden">
+      <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-xl border-border/50 bg-card/95 backdrop-blur-xl p-0 gap-0 overflow-visible">
         {/* ── Header ── */}
         <DialogHeader className="border-b border-border/40 px-6 py-4">
           <div className="flex items-center gap-2.5">
