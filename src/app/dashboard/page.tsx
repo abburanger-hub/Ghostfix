@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import RefreshButton from "@/components/dashboard/refresh-button";
+import SubmitTicketDialog from "@/components/dashboard/submit-ticket-dialog";
 import {
   ExternalLink,
   Ghost,
@@ -239,12 +240,15 @@ function EmptyState() {
           No tickets intercepted yet
         </p>
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-          Fire a{" "}
+          Click{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-indigo-400">
+            + New Ticket
+          </code>{" "}
+          above to submit your first bug report, or send a{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-indigo-400">
             POST /api/ingest
           </code>{" "}
-          with a bug report from Zoho Desk or Zoho Cliq. GhostFix will triage
-          it in real time and appear here instantly.
+          webhook. GhostFix will triage it with AI and appear here instantly.
         </p>
         <div className="mt-4 rounded-xl border border-border/40 bg-muted/20 p-3 text-left">
           <p className="mb-2 font-mono text-[10px] text-muted-foreground/60">
@@ -255,7 +259,7 @@ function EmptyState() {
             <br />
             {`  -H "Content-Type: application/json" \\`}
             <br />
-            {`  -d '{"source":"Zoho Desk",`}
+            {`  -d '{"source":"API",`}
             <br />
             {`       "user_email":"you@co.com",`}
             <br />
@@ -470,6 +474,7 @@ export default async function DashboardPage() {
                 Live
               </span>
             </div>
+            <SubmitTicketDialog />
             <RefreshButton />
           </div>
         </div>

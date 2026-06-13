@@ -2,7 +2,7 @@
 // GhostFix — Webhook Ingestion Route
 // POST /api/ingest
 //
-// Accepts bug reports from Zoho Desk and Zoho Cliq webhooks.
+// Accepts bug reports from any source (Web Form, API, Slack, Email, etc.)
 // Pipeline:
 //   1. Validate the incoming payload and (optionally) the webhook secret.
 //   2. Persist the raw ticket to Supabase with status = 'pending'.
