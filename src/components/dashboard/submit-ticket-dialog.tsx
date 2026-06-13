@@ -462,13 +462,60 @@ export default function SubmitTicketDialog({
       setResult(data);
       setPhase("done");
 
+      // ── Fire Novus track events ──────────────────────────────────────────
+      if (typeof pendo !== "undefined") {
+        // Every successful submission
+        pendo.track("ticket_ingested", {
+          source,
+          status: data.status,
+          confidence_score: data.triage.confidence_score,
+          matched_historical_fix: data.triage.matched_historical_fix,
+          historical_matches_found: data.triage.historical_matches_found,
+        });
+
+        // AI completed its analysis
+        pendo.track("ai_triage_completed", {
+          failing_module: data.triage.failing_module,
+          confidence_score: data.triage.confidence_score,
+          matched_historical_fix: data.triage.matched_historical_fix,
+          auto_patch_viable: data.status === "patched",
+          source,
+        });
+
+        // Outcome: patched or escalated
+        if (data.status === "patched") {
+          pendo.track("ghost_environment_provisioned", {
+            source,
+            confidence_score: data.triage.confidence_score,
+            matched_historical_fix: data.triage.matched_historical_fix,
+            failing_module: data.triage.failing_module,
+          });
+        } else {
+          pendo.track("ticket_escalated", {
+            source,
+            confidence_score: data.triage.confidence_score,
+            failing_module: data.triage.failing_module,
+            matched_historical_fix: data.triage.matched_historical_fix,
+          });
+        }
+      }
+
       // Refresh the dashboard table in the background
       startTransition(() => router.refresh());
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
-      setErrorMsg(
-        err instanceof Error ? err.message : "Something went wrong. Please try again."
-      );
+
+      const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+
+      // Fire ingestion failure event
+      if (typeof pendo !== "undefined") {
+        pendo.track("ticket_ingestion_failed", {
+          source,
+          error: msg,
+        });
+      }
+
+      setErrorMsg(msg);
       setPhase("error");
     }
   }

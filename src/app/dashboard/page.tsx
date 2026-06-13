@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import RefreshButton from "@/components/dashboard/refresh-button";
 import SubmitTicketDialog from "@/components/dashboard/submit-ticket-dialog";
+import PendoDashboardTracker from "@/components/dashboard/pendo-tracker";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -462,6 +463,15 @@ export default async function DashboardPage({
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Fire dashboard_data_loaded track event on every page mount */}
+      <PendoDashboardTracker
+        total={total}
+        patched={patched}
+        inPipeline={inPipeline}
+        escalated={escalated}
+        patchRate={patchRate}
+        isDemo={isDemo}
+      />
 
       {/* ═══ TOP NAV BAR ═══════════════════════════════════════════════════ */}
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/70 backdrop-blur-xl">
