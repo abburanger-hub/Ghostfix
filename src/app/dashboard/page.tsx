@@ -162,10 +162,13 @@ function ActionButton({ ticket }: { ticket: IncomingTicketRow }) {
   }
   if (ticket.status === "escalated") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-xs font-medium text-red-400/50 cursor-not-allowed select-none">
+      <Link
+        href={`/escalate/${ticket.id}`}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:border-red-500/50 hover:bg-red-500/20 hover:text-red-300"
+      >
         <AlertTriangle className="size-3" />
-        Escalated
-      </span>
+        Review
+      </Link>
     );
   }
   if (ticket.status === "analyzing") {
