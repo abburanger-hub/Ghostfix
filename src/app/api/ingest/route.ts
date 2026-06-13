@@ -62,13 +62,13 @@ interface TriageResult {
  * the configured base URL, producing a unique temporary hotfix environment
  * link for the affected user.
  *
- * Example output: https://ghostfix.app/patch/a3f7c91b4d2e8056f1a0c3b7d9e2f415
+ * Example output: https://ghostfix.vercel.app/patch/a3f7c91b4d2e8056f1a0c3b7d9e2f415
  */
 function generateGhostLink(): string {
   const slug = randomBytes(16).toString("hex"); // 32-char hex string
   const base =
     process.env.GHOST_ENV_BASE_URL?.replace(/\/$/, "") ??
-    "https://ghostfix.app/patch";
+    "https://ghostfix.vercel.app/patch";
   return `${base}/${slug}`;
 }
 

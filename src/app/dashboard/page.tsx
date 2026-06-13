@@ -314,7 +314,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     status: "patched",
     failing_module: "AppTier",
     triage_summary: "Reset the AppTier connection pool and increase timeout from 2s to 5s to prevent cascade failures under load.",
-    generated_ghost_link: "https://ghostfix.app/patch/a3f7c91b4d2e8056f1a0c3b7d9e2f415",
+    generated_ghost_link: "https://ghostfix.vercel.app/patch/a3f7c91b4d2e8056f1a0c3b7d9e2f415",
     created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
   },
   {
@@ -325,7 +325,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     status: "patched",
     failing_module: "Auth Service",
     triage_summary: "Add 300s clock-skew tolerance to JWT verification to eliminate false session expiry caused by server time drift.",
-    generated_ghost_link: "https://ghostfix.app/patch/b7e2f3a1c5d9e0f4b8a2c6d0e1f3a7b9",
+    generated_ghost_link: "https://ghostfix.vercel.app/patch/b7e2f3a1c5d9e0f4b8a2c6d0e1f3a7b9",
     created_at: new Date(Date.now() - 1000 * 60 * 7).toISOString(),
   },
   {
@@ -336,7 +336,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     status: "patched",
     failing_module: "Upload Gateway",
     triage_summary: "Raise API gateway payload limit from 10MB to 100MB and add missing CORS header on the storage endpoint.",
-    generated_ghost_link: "https://ghostfix.app/patch/c9d4e2f1a6b8c0d3e5f7a1b4c8d2e6f0",
+    generated_ghost_link: "https://ghostfix.vercel.app/patch/c9d4e2f1a6b8c0d3e5f7a1b4c8d2e6f0",
     created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
   },
   {
