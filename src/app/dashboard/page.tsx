@@ -462,7 +462,7 @@ export default async function DashboardPage({
 
       {/* ═══ TOP NAV BAR ═══════════════════════════════════════════════════ */}
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
+        <div className="flex items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
 
           {/* Brand */}
           <div className="flex items-center gap-3">
@@ -515,7 +515,7 @@ export default async function DashboardPage({
       </header>
 
       {/* ═══ MAIN CONTENT ══════════════════════════════════════════════════ */}
-      <main className="mx-auto max-w-7xl px-6 py-10">
+      <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
 
         {/* Page title */}
         <div className="mb-8">
@@ -742,7 +742,7 @@ export default async function DashboardPage({
 
             {/* ── Pagination bar ─────────────────────────────────────── */}
             {!fetchError && tickets.length > 0 && (
-              <div className="flex items-center justify-between border-t border-border/40 px-6 py-3">
+              <div className="flex flex-col items-center gap-3 border-t border-border/40 px-6 py-4 sm:flex-row sm:justify-between">
                 {/* Page info */}
                 <p className="text-xs text-muted-foreground/60">
                   Showing{" "}
@@ -754,7 +754,7 @@ export default async function DashboardPage({
                   ticket{total !== 1 ? "s" : ""}
                 </p>
 
-                {/* Prev / Page indicator / Next */}
+                {/* Prev / Page pills / Next */}
                 <div className="flex items-center gap-1.5">
                   <Link
                     href={`/dashboard?page=${currentPage - 1}`}
@@ -769,22 +769,24 @@ export default async function DashboardPage({
                     Prev
                   </Link>
 
-                  {/* Page pills */}
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                      <Link
-                        key={p}
-                        href={`/dashboard?page=${p}`}
-                        className={`inline-flex size-7 items-center justify-center rounded-lg text-xs font-medium transition-colors ${
-                          p === currentPage
-                            ? "bg-indigo-500/20 border border-indigo-500/40 text-indigo-300"
-                            : "border border-transparent text-muted-foreground/50 hover:border-border/40 hover:text-foreground/70"
-                        }`}
-                      >
-                        {p}
-                      </Link>
-                    ))}
-                  </div>
+                  {/* Page number pills — hide when only 1 page */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                        <Link
+                          key={p}
+                          href={`/dashboard?page=${p}`}
+                          className={`inline-flex size-7 items-center justify-center rounded-lg text-xs font-medium transition-colors ${
+                            p === currentPage
+                              ? "border border-indigo-500/40 bg-indigo-500/20 text-indigo-300"
+                              : "border border-transparent text-muted-foreground/50 hover:border-border/40 hover:text-foreground/70"
+                          }`}
+                        >
+                          {p}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
 
                   <Link
                     href={`/dashboard?page=${currentPage + 1}`}
@@ -805,7 +807,7 @@ export default async function DashboardPage({
         </Card>
 
         {/* ═══ FOOTER ═════════════════════════════════════════════════════ */}
-        <div className="mt-8 flex flex-col items-center justify-between gap-2 text-[11px] text-muted-foreground/40 sm:flex-row">
+        <div className="mt-6 flex flex-col items-center justify-between gap-2 text-[11px] text-muted-foreground/40 sm:flex-row">
           <span>
             GhostFix · Autonomous SRE Triage Agent · World Product Day 2026
           </span>
