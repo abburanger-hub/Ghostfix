@@ -38,8 +38,25 @@ export default function ResolveButton({ ticketId, issueText, failingModule }: Re
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
-      setSavedToKb(saveToKb && !!note.trim());
+      const resBody = await res.json().catch(() => ({}));
+      const didSaveKb = resBody.kb_saved === true;
+      setSavedToKb(didSaveKb);
       setStatus("done");
+      // Fire Novus track events
+      if (typeof pendo !== "undefined") {
+        pendo.track("ticket_resolved", {
+          ticket_id: ticketId,
+          failing_module: failingModule,
+          has_note: !!note.trim(),
+        });
+        if (didSaveKb) {
+          pendo.track("fix_saved_to_kb", {
+            ticket_id: ticketId,
+            failing_module: failingModule,
+            note_length: note.trim().length,
+          });
+        }
+      }
       // Refresh the page to show the resolved state
       setTimeout(() => router.refresh(), 800);
     } catch (err) {
