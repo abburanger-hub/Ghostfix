@@ -50,6 +50,7 @@ import {
   Cpu,
   Shield,
   Inbox,
+  BookOpen,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -515,7 +516,14 @@ export default async function DashboardPage({
 
           {/* Right controls */}
           <div className="flex items-center gap-3">
-            {/* Patch rate pill */}
+            {/* KB link */}
+            <Link
+              href="/kb"
+              className="hidden items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/8 px-3 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:border-violet-500/40 hover:bg-violet-500/15 sm:flex"
+            >
+              <BookOpen className="size-3" />
+              Knowledge Base
+            </Link>
             {total > 0 && (
               <div className="hidden items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-3 py-1.5 sm:flex">
                 <Activity className="size-3 text-muted-foreground" />

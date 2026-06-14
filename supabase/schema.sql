@@ -41,11 +41,15 @@ CREATE INDEX idx_incoming_tickets_email     ON public.incoming_tickets (user_ema
 -- The AI's knowledge base: known error signatures + their proven resolutions.
 -- =============================================================================
 CREATE TABLE public.historical_fixes (
-    id                  UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
-    error_signature     TEXT    NOT NULL UNIQUE,    -- keyword/phrase the AI matches against
-    proposed_solution   TEXT    NOT NULL,           -- plain-English description of the fix
-    mock_patch_code     TEXT    NOT NULL            -- simulated diff / patch shown to the user
+    id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    error_signature     TEXT        NOT NULL UNIQUE,    -- keyword/phrase the AI matches against
+    proposed_solution   TEXT        NOT NULL,           -- plain-English description of the fix
+    mock_patch_code     TEXT        NOT NULL,           -- simulated diff / patch shown to the user
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- To add created_at to an existing historical_fixes table, run:
+-- ALTER TABLE public.historical_fixes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 -- Full-text search index so the AI can do fuzzy matching on error signatures
 CREATE INDEX idx_historical_fixes_fts

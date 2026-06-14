@@ -49,6 +49,7 @@ export interface HistoricalFixRow {
   error_signature: string;
   proposed_solution: string;
   mock_patch_code: string;
+  created_at?: string | null;
 }
 
 // ---------------------------------------------------------------------------

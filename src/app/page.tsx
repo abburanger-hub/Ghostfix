@@ -190,6 +190,9 @@ export default async function LandingPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/kb" className="hidden items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground sm:flex">
+              Knowledge Base
+            </Link>
             <Link href="/dashboard" className="hidden items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground sm:flex">
               Dashboard <ArrowRight className="size-3" />
             </Link>
