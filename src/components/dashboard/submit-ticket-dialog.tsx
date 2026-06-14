@@ -617,9 +617,9 @@ export default function SubmitTicketDialog({
         />
       )}
 
-      <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-xl border-border/50 bg-card/95 backdrop-blur-xl p-0 gap-0 overflow-visible">
+      <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-xl border-border/50 bg-card/95 backdrop-blur-xl p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
         {/* ── Header ── */}
-        <DialogHeader className="border-b border-border/40 px-6 py-4">
+        <DialogHeader className="shrink-0 border-b border-border/40 px-6 py-4">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 shadow-md shadow-indigo-500/25">
               <Ghost className="size-4 text-white" />
@@ -635,7 +635,7 @@ export default function SubmitTicketDialog({
           </div>
         </DialogHeader>
 
-        <div className="px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {/* ── FORM ── */}
           {phase === "idle" && (
             <form onSubmit={handleSubmit} className="space-y-4">
