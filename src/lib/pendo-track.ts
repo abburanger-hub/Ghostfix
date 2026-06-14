@@ -33,7 +33,7 @@ export interface PendoTrackOptions {
 export async function pendoTrack({
   event,
   visitorId,
-  accountId = "ghostfix",
+  accountId = "ghostfix-app",
   properties = {},
 }: PendoTrackOptions): Promise<void> {
   try {
