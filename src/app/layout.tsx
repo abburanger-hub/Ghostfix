@@ -58,16 +58,31 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
 (function() {
-  // Use a stable anonymous ID so Pendo counts unique visitors correctly.
-  // We store the ID in localStorage so repeat visits are recognized.
-  var visitorId = (typeof localStorage !== 'undefined' && localStorage.getItem('gf_visitor_id'));
-  if (!visitorId) {
-    visitorId = 'anon-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    try { localStorage.setItem('gf_visitor_id', visitorId); } catch(e) {}
+  // Check if the visitor has previously submitted a ticket — we store their
+  // real email in localStorage so Pendo can identify them on return visits.
+  // This makes the "Dashboard visitors" KPI show real data instead of 0.
+  var storedEmail = (typeof localStorage !== 'undefined' && localStorage.getItem('gf_visitor_email')) || null;
+
+  // Fall back to a stable anonymous ID for first-time visitors who haven't
+  // yet submitted a ticket. Stored so repeat visits are de-duped.
+  var anonId = (typeof localStorage !== 'undefined' && localStorage.getItem('gf_visitor_id'));
+  if (!anonId) {
+    anonId = 'anon-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem('gf_visitor_id', anonId); } catch(e) {}
   }
+
+  // Identified visitor (submitted a ticket before) → use their real email.
+  // Anonymous visitor (first visit) → use stable anon ID.
+  var visitorId = storedEmail || anonId;
+
   pendo.initialize({
-    visitor:  { id: visitorId, app: 'ghostfix-dashboard' },
-    account:  { id: 'ghostfix-app' }
+    visitor: {
+      id:    visitorId,
+      email: storedEmail || undefined,
+      role:  storedEmail ? 'engineer' : 'visitor',
+      app:   'ghostfix-dashboard'
+    },
+    account: { id: 'ghostfix-app', name: 'GhostFix' }
   });
 })();
             `,

@@ -467,6 +467,30 @@ export default function SubmitTicketDialog({
       setResult(data);
       setPhase("done");
 
+      // ── Identify this visitor in Novus now that we have their real email ──
+      // This upgrades the session from anonymous → identified, making the
+      // "Dashboard visitors" KPI show a real count in the Novus dashboard.
+      // The email is also persisted to localStorage so future visits are
+      // identified immediately on page load (before any form interaction).
+      try {
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem("gf_visitor_email", email.trim());
+        }
+        if (typeof pendo !== "undefined") {
+          pendo.identify({
+            visitor: {
+              id:    email.trim(),
+              email: email.trim(),
+              role:  "engineer",
+              app:   "ghostfix-dashboard",
+            },
+            account: { id: "ghostfix-app", name: "GhostFix" },
+          });
+        }
+      } catch (_) {
+        // Non-fatal — identification failure must not break the UI
+      }
+
       // ── Fire Novus track events ──────────────────────────────────────────
       if (typeof pendo !== "undefined") {
         // Every successful submission
