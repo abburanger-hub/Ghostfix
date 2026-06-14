@@ -27,6 +27,7 @@ import {
   Lock,
 } from "lucide-react";
 import Link from "next/link";
+import EnvTester from "./env-tester";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -209,6 +210,13 @@ export default async function PatchPage({
                 )}
               </div>
             </div>
+
+            {/* ── Interactive Live Test ── */}
+            <EnvTester
+              slug={slug}
+              module={ticket?.failing_module ?? "Core Service"}
+              fixSummary={ticket?.triage_summary ?? "Automated patch applied to resolve the reported issue."}
+            />
 
             {/* Mock diff / patch code */}
             <div className="rounded-2xl border border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden">
