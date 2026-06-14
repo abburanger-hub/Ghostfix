@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import PendoNavigationTracker from "@/components/dashboard/pendo-navigation-tracker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -39,7 +40,7 @@ export default function RootLayout({
       <head>
         <Script
           id="novus-pendo-install"
-          strategy="afterInteractive"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
 (function(apiKey){
@@ -79,7 +80,9 @@ export default function RootLayout({
     visitor: {
       id:    visitorId,
       email: storedEmail || undefined,
-      role:  storedEmail ? 'engineer' : 'visitor',
+      // All GhostFix users are SRE engineers — use a consistent role so
+      // the "Dashboard visitors" headline metric counts every visitor.
+      role:  'sre-engineer',
       app:   'ghostfix-dashboard'
     },
     account: { id: 'ghostfix-app', name: 'GhostFix' }
@@ -91,6 +94,7 @@ export default function RootLayout({
       </head>
 
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <PendoNavigationTracker />
         {children}
       </body>
     </html>
