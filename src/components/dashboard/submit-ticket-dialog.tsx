@@ -35,6 +35,8 @@ import {
   Database,
   BookOpen,
   ChevronRight,
+  Copy,
+  Check,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -214,6 +216,14 @@ function ResultCard({
 }) {
   const isPatched = result.status === "patched";
   const conf = Math.round(result.triage.confidence_score * 100);
+  const [copied, setCopied] = useState(false);
+
+  async function copyGhostLink() {
+    if (!result.ghost_environment.url) return;
+    await navigator.clipboard.writeText(result.ghost_environment.url).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   return (
     <div className="space-y-4">
@@ -337,22 +347,55 @@ function ResultCard({
 
       {/* Ghost environment link */}
       {result.ghost_environment.url && (
-        <a
-          href={result.ghost_environment.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex w-full items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/8 px-4 py-3 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/12 group"
-        >
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-emerald-300">
-              Ghost Environment URL
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/8 overflow-hidden">
+          {/* Card header */}
+          <div className="flex items-center gap-2 border-b border-emerald-500/20 px-4 py-2.5">
+            <Ghost className="size-3.5 text-emerald-400" />
+            <p className="text-xs font-semibold text-emerald-300">
+              Ghost Environment Ready
             </p>
-            <p className="mt-0.5 truncate font-mono text-[10px] text-emerald-500/60">
-              {result.ghost_environment.url}
-            </p>
+            <span className="ml-auto size-1.5 rounded-full bg-emerald-400 animate-pulse block" />
           </div>
-          <ExternalLink className="size-4 shrink-0 text-emerald-400 group-hover:text-emerald-300" />
-        </a>
+
+          {/* Body */}
+          <div className="px-4 py-3 space-y-2.5">
+            <p className="text-[11px] text-emerald-400/70 leading-relaxed">
+              Your patch is live in an isolated environment. Open the link below to
+              validate the fix — no setup required.
+            </p>
+
+            {/* URL row */}
+            <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-black/30 pl-3 pr-1.5 py-2">
+              <p className="min-w-0 flex-1 truncate font-mono text-[11px] text-emerald-300/90 select-all">
+                {result.ghost_environment.url}
+              </p>
+
+              {/* Copy button */}
+              <button
+                onClick={copyGhostLink}
+                className="shrink-0 rounded-md p-1.5 text-emerald-400/50 transition-colors hover:bg-emerald-500/15 hover:text-emerald-300"
+                title="Copy URL"
+              >
+                {copied ? (
+                  <Check className="size-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+              </button>
+
+              {/* Open in new tab */}
+              <a
+                href={result.ghost_environment.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 rounded-md p-1.5 text-emerald-400/50 transition-colors hover:bg-emerald-500/15 hover:text-emerald-300"
+                title="Open ghost environment"
+              >
+                <ExternalLink className="size-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Actions */}
