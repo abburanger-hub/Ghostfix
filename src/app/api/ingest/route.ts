@@ -18,6 +18,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { IncomingTicketRow, TicketSource, TicketStatus } from "@/lib/supabase/types";
 import { randomBytes } from "crypto";
 import { pendoTrack } from "@/lib/pendo-track";
+import { sendPatchReadyEmail, sendEscalationEmail } from "@/lib/send-patch-email";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -480,7 +481,27 @@ export async function POST(request: NextRequest) {
     // Non-fatal — the ticket is still saved. Log and continue.
   }
 
-  // ── 7. Return structured response to the webhook caller ──────────────────
+  // ── 7. Send email notification to the reporter ───────────────────────────
+  if (ghostLink) {
+    // Patch ready → send ghost environment link
+    void sendPatchReadyEmail({
+      to: user_email,
+      ticketId,
+      failingModule: triage.failing_module,
+      fixSummary: triage.fix_summary,
+      ghostLink,
+    });
+  } else {
+    // Escalated → let them know a human is on it
+    void sendEscalationEmail({
+      to: user_email,
+      ticketId,
+      failingModule: triage.failing_module,
+      fixSummary: triage.fix_summary,
+    });
+  }
+
+  // ── 8. Return structured response to the webhook caller ──────────────────
   return NextResponse.json(
     {
       success: true,
