@@ -5,7 +5,7 @@
 // Client Component — handles form state, live AI thinking steps, result display.
 // =============================================================================
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -37,11 +37,18 @@ import {
   ChevronRight,
   Copy,
   Check,
+  GitBranch,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+interface TeamOption {
+  id: string;
+  name: string;
+  has_repo: boolean;
+}
 
 type Phase =
   | "idle"        // form visible, waiting for input
@@ -439,6 +446,25 @@ export default function SubmitTicketDialog({
   const [source, setSource] = useState("Web Form");
   const [email, setEmail] = useState("");
   const [issueText, setIssueText] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [teams, setTeams] = useState<TeamOption[]>([]);
+
+  // Fetch teams when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/teams")
+      .then((r) => r.json())
+      .then((data: { teams?: { id: string; name: string; team_repos?: unknown[] }[] }) => {
+        setTeams(
+          (data.teams ?? []).map((t) => ({
+            id: t.id,
+            name: t.name,
+            has_repo: Array.isArray(t.team_repos) && t.team_repos.length > 0,
+          })),
+        );
+      })
+      .catch(() => {}); // Non-fatal — team selector just stays empty
+  }, [open]);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -449,6 +475,7 @@ export default function SubmitTicketDialog({
     setEmail("");
     setIssueText("");
     setSource("Web Form");
+    setTeamId("");
   }
 
   function handleClose(openState: boolean) {
@@ -492,6 +519,7 @@ export default function SubmitTicketDialog({
           source,
           user_email: email.trim(),
           issue_text: issueText.trim(),
+          ...(teamId ? { team_id: teamId } : {}),
         }),
         signal: abortRef.current.signal,
       });
@@ -692,6 +720,35 @@ export default function SubmitTicketDialog({
                   Be specific — the more detail, the higher the AI confidence score.
                 </p>
               </div>
+
+              {/* Team selector — optional, enables real GitHub PR creation */}
+              {teams.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="team" className="text-xs text-muted-foreground">
+                    Team{" "}
+                    <span className="text-muted-foreground/40">(optional)</span>
+                  </Label>
+                  <select
+                    id="team"
+                    value={teamId}
+                    onChange={(e) => setTeamId(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
+                  >
+                    <option value="" className="bg-card text-foreground">No team — standard triage</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-card text-foreground">
+                        {t.name}{t.has_repo ? " ⚡ real PR" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {teamId && teams.find((t) => t.id === teamId)?.has_repo && (
+                    <p className="flex items-center gap-1 text-[10px] text-emerald-400/70">
+                      <GitBranch className="size-3" />
+                      GhostFix will open a real pull request on your GitHub repo.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Submit */}
               <Button

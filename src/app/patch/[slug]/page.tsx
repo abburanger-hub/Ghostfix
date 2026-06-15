@@ -25,6 +25,8 @@ import {
   Zap,
   AlertTriangle,
   Lock,
+  GitBranch,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import EnvTester from "./env-tester";
@@ -144,6 +146,20 @@ export default async function PatchPage({
               env/{slug.slice(0, 8)}...{slug.slice(-8)}
             </span>
           </div>
+
+          {/* GitHub PR link — only shown when a real PR was created */}
+          {ticket?.github_pr_url && (
+            <a
+              href={ticket.github_pr_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/8 px-5 py-2.5 text-sm font-semibold text-violet-300 transition-colors hover:border-violet-500/50 hover:bg-violet-500/15"
+            >
+              <GitBranch className="size-4" />
+              View Pull Request on GitHub
+              <ExternalLink className="size-3.5 opacity-70" />
+            </a>
+          )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -218,7 +234,7 @@ export default async function PatchPage({
               fixSummary={ticket?.triage_summary ?? "Automated patch applied to resolve the reported issue."}
             />
 
-            {/* Mock diff / patch code */}
+            {/* Diff / patch code */}
             <div className="rounded-2xl border border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden">
               <div className="flex items-center gap-2 border-b border-border/40 bg-muted/20 px-5 py-3">
                 <Terminal className="size-3.5 text-muted-foreground/60" />
@@ -228,46 +244,70 @@ export default async function PatchPage({
                 <span className="ml-auto rounded bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] text-emerald-400">
                   applied
                 </span>
+                {ticket?.github_pr_url && (
+                  <span className="rounded bg-violet-500/15 px-2 py-0.5 font-mono text-[10px] text-violet-400">
+                    real
+                  </span>
+                )}
               </div>
               <pre className="overflow-x-auto p-5 text-[11px] leading-relaxed font-mono">
-                <code>
-                  <span className="text-muted-foreground/40">
-                    {"--- a/src/services/" +
-                      (ticket?.failing_module ?? "core")
-                        .toLowerCase()
-                        .replace(/\s+/g, "-") +
-                      ".ts\n"}
-                  </span>
-                  <span className="text-muted-foreground/40">
-                    {"+++ b/src/services/" +
-                      (ticket?.failing_module ?? "core")
-                        .toLowerCase()
-                        .replace(/\s+/g, "-") +
-                      ".ts\n"}
-                  </span>
-                  <span className="text-zinc-500">{"@@ -12,7 +12,10 @@\n"}</span>
-                  <span className="text-red-400/80">
-                    {"- // Previous configuration\n- const config = getDefaultConfig();\n"}
-                  </span>
-                  <span className="text-emerald-400">
-                    {"+ // GhostFix patch · " + new Date().toISOString().split("T")[0] + "\n"}
-                  </span>
-                  <span className="text-emerald-400">
-                    {"+ // Fix: " +
-                      (ticket?.triage_summary ?? "Apply recommended configuration fix")
-                        .replace(/[\r\n]+/g, " ")
-                        .slice(0, 80) +
-                      "\n"}
-                  </span>
-                  <span className="text-emerald-400">
-                    {"+ const config = getPatchedConfig({ module: '" +
-                      (ticket?.failing_module ?? "core") +
-                      "' });\n"}
-                  </span>
-                  <span className="text-zinc-600">
-                    {"  \n  export default config;\n"}
-                  </span>
-                </code>
+                {ticket?.real_patch_code ? (
+                  <code className="whitespace-pre-wrap break-all">
+                    {ticket.real_patch_code.split("\n").map((line, i) => {
+                      const cls = line.startsWith("+")
+                        ? "text-emerald-400"
+                        : line.startsWith("-")
+                        ? "text-red-400/80"
+                        : line.startsWith("@@")
+                        ? "text-zinc-500"
+                        : "text-muted-foreground/40";
+                      return (
+                        <span key={i} className={`block ${cls}`}>
+                          {line}
+                        </span>
+                      );
+                    })}
+                  </code>
+                ) : (
+                  <code>
+                    <span className="text-muted-foreground/40">
+                      {"--- a/src/services/" +
+                        (ticket?.failing_module ?? "core")
+                          .toLowerCase()
+                          .replace(/\s+/g, "-") +
+                        ".ts\n"}
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"+++ b/src/services/" +
+                        (ticket?.failing_module ?? "core")
+                          .toLowerCase()
+                          .replace(/\s+/g, "-") +
+                        ".ts\n"}
+                    </span>
+                    <span className="text-zinc-500">{"@@ -12,7 +12,10 @@\n"}</span>
+                    <span className="text-red-400/80">
+                      {"- // Previous configuration\n- const config = getDefaultConfig();\n"}
+                    </span>
+                    <span className="text-emerald-400">
+                      {"+ // GhostFix patch · " + new Date().toISOString().split("T")[0] + "\n"}
+                    </span>
+                    <span className="text-emerald-400">
+                      {"+ // Fix: " +
+                        (ticket?.triage_summary ?? "Apply recommended configuration fix")
+                          .replace(/[\r\n]+/g, " ")
+                          .slice(0, 80) +
+                        "\n"}
+                    </span>
+                    <span className="text-emerald-400">
+                      {"+ const config = getPatchedConfig({ module: '" +
+                        (ticket?.failing_module ?? "core") +
+                        "' });\n"}
+                    </span>
+                    <span className="text-zinc-600">
+                      {"  \n  export default config;\n"}
+                    </span>
+                  </code>
+                )}
               </pre>
             </div>
           </div>

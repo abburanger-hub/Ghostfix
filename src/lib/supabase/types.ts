@@ -38,9 +38,12 @@ export interface IncomingTicketRow {
   user_email: string;
   issue_text: string;
   status: TicketStatus;
-  failing_module: string | null;     // AI-identified failing component
-  triage_summary: string | null;     // AI one-sentence fix description
+  failing_module: string | null;
+  triage_summary: string | null;
   generated_ghost_link: string | null;
+  team_id: string | null;
+  github_pr_url: string | null;
+  real_patch_code: string | null;
   created_at: string;
 }
 
@@ -50,6 +53,33 @@ export interface HistoricalFixRow {
   proposed_solution: string;
   mock_patch_code: string;
   created_at?: string | null;
+}
+
+export interface TeamRow {
+  id: string;
+  name: string;
+  slug: string;
+  owner_email: string;
+  created_at: string;
+}
+
+export interface TeamMemberRow {
+  id: string;
+  team_id: string;
+  email: string;
+  role: "owner" | "member";
+  created_at: string;
+}
+
+export interface TeamRepoRow {
+  id: string;
+  team_id: string;
+  repo_owner: string;
+  repo_name: string;
+  default_branch: string;
+  github_pat: string;
+  modules: string[];
+  created_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +95,9 @@ export interface IncomingTicketInsert {
   failing_module?: string | null;
   triage_summary?: string | null;
   generated_ghost_link?: string | null;
+  team_id?: string | null;
+  github_pr_url?: string | null;
+  real_patch_code?: string | null;
   created_at?: string;
 }
 
@@ -87,6 +120,9 @@ export interface IncomingTicketUpdate {
   failing_module?: string | null;
   triage_summary?: string | null;
   generated_ghost_link?: string | null;
+  team_id?: string | null;
+  github_pr_url?: string | null;
+  real_patch_code?: string | null;
   created_at?: string;
 }
 

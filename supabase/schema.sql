@@ -58,10 +58,58 @@ CREATE INDEX idx_historical_fixes_fts
 
 
 -- =============================================================================
+-- TABLE 3: teams
+-- Each team owns a set of modules and connects one GitHub repo.
+-- =============================================================================
+CREATE TABLE public.teams (
+    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name          TEXT        NOT NULL,
+    slug          TEXT        NOT NULL UNIQUE,
+    owner_email   TEXT        NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =============================================================================
+-- TABLE 4: team_members
+-- =============================================================================
+CREATE TABLE public.team_members (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id     UUID        NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
+    email       TEXT        NOT NULL,
+    role        TEXT        NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member')),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(team_id, email)
+);
+
+-- =============================================================================
+-- TABLE 5: team_repos
+-- GitHub repo connected to a team. PAT stored plaintext (encrypt in prod).
+-- =============================================================================
+CREATE TABLE public.team_repos (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id         UUID        NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE UNIQUE,
+    repo_owner      TEXT        NOT NULL,
+    repo_name       TEXT        NOT NULL,
+    default_branch  TEXT        NOT NULL DEFAULT 'main',
+    github_pat      TEXT        NOT NULL,
+    modules         TEXT[]      NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Add GitHub-related columns to incoming_tickets
+-- (Run these ALTER statements if the table already exists)
+ALTER TABLE public.incoming_tickets ADD COLUMN IF NOT EXISTS team_id       UUID REFERENCES public.teams(id);
+ALTER TABLE public.incoming_tickets ADD COLUMN IF NOT EXISTS github_pr_url TEXT;
+ALTER TABLE public.incoming_tickets ADD COLUMN IF NOT EXISTS real_patch_code TEXT;
+
+-- =============================================================================
 -- ROW LEVEL SECURITY
 -- =============================================================================
 ALTER TABLE public.incoming_tickets  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.historical_fixes  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teams             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_members      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_repos        ENABLE ROW LEVEL SECURITY;
 
 -- Anyone (anon role) can INSERT a new ticket (i.e., submit a bug report)
 CREATE POLICY "Public can submit tickets"

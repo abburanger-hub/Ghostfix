@@ -51,6 +51,7 @@ import {
   Shield,
   Inbox,
   BookOpen,
+  Users,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -326,6 +327,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     failing_module: "AppTier",
     triage_summary: "Reset the AppTier connection pool and increase timeout from 2s to 5s to prevent cascade failures under load.",
     generated_ghost_link: "https://ghostfix.vercel.app/patch/a3f7c91b4d2e8056f1a0c3b7d9e2f415",
+    team_id: null, github_pr_url: null, real_patch_code: null,
     created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
   },
   {
@@ -337,6 +339,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     failing_module: "Auth Service",
     triage_summary: "Add 300s clock-skew tolerance to JWT verification to eliminate false session expiry caused by server time drift.",
     generated_ghost_link: "https://ghostfix.vercel.app/patch/b7e2f3a1c5d9e0f4b8a2c6d0e1f3a7b9",
+    team_id: null, github_pr_url: null, real_patch_code: null,
     created_at: new Date(Date.now() - 1000 * 60 * 7).toISOString(),
   },
   {
@@ -348,6 +351,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     failing_module: "Upload Gateway",
     triage_summary: "Raise API gateway payload limit from 10MB to 100MB and add missing CORS header on the storage endpoint.",
     generated_ghost_link: "https://ghostfix.vercel.app/patch/c9d4e2f1a6b8c0d3e5f7a1b4c8d2e6f0",
+    team_id: null, github_pr_url: null, real_patch_code: null,
     created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
   },
   {
@@ -359,6 +363,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     failing_module: "Mailer Worker",
     triage_summary: "SMTP credentials rotated last week — re-point mailer to updated SMTP_USER_V2 and SMTP_PASS_V2 env vars.",
     generated_ghost_link: null,
+    team_id: null, github_pr_url: null, real_patch_code: null,
     created_at: new Date(Date.now() - 1000 * 60 * 31).toISOString(),
   },
   {
@@ -370,6 +375,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     failing_module: null,
     triage_summary: null,
     generated_ghost_link: null,
+    team_id: null, github_pr_url: null, real_patch_code: null,
     created_at: new Date(Date.now() - 1000 * 60 * 44).toISOString(),
   },
   {
@@ -381,6 +387,7 @@ const DEMO_TICKETS: IncomingTicketRow[] = [
     failing_module: null,
     triage_summary: null,
     generated_ghost_link: null,
+    team_id: null, github_pr_url: null, real_patch_code: null,
     created_at: new Date(Date.now() - 1000 * 60 * 58).toISOString(),
   },
 ];
@@ -523,6 +530,14 @@ export default async function DashboardPage({
             >
               <BookOpen className="size-3" />
               Knowledge Base
+            </Link>
+            {/* Teams link */}
+            <Link
+              href="/teams"
+              className="hidden items-center gap-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/8 px-3 py-1.5 text-xs font-medium text-indigo-400 transition-colors hover:border-indigo-500/40 hover:bg-indigo-500/15 sm:flex"
+            >
+              <Users className="size-3" />
+              Teams
             </Link>
             {total > 0 && (
               <div className="hidden items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-3 py-1.5 sm:flex">

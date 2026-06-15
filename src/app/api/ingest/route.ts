@@ -19,19 +19,15 @@ import type { IncomingTicketRow, TicketSource, TicketStatus } from "@/lib/supaba
 import { randomBytes } from "crypto";
 import { pendoTrack } from "@/lib/pendo-track";
 import { sendPatchReadyEmail, sendEscalationEmail } from "@/lib/send-patch-email";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import { findModuleFiles, fetchFileContent, createPullRequest } from "@/lib/github";
 
 /** The exact shape the webhook caller must send */
 interface IngestPayload {
-  /** Natural-language bug description from the user */
   issue_text: string;
-  /** Which tool sent the webhook */
   source: TicketSource;
-  /** Reporter's email — used to send the ghost link back to them */
   user_email: string;
+  /** Optional — if provided, triggers real GitHub PR creation */
+  team_id?: string;
 }
 
 /** Shape of a row returned from the historical_fixes knowledge base */
@@ -291,6 +287,92 @@ Analyze this report and return the JSON triage result.
 }
 
 // ---------------------------------------------------------------------------
+// AI Real Patch Generation
+// Sends the bug report + real file content to Groq and gets back a patched
+// version of the file plus a diff preview.
+// ---------------------------------------------------------------------------
+
+interface RealPatchResult {
+  patched_content: string;
+  diff_preview: string;
+  changed_function: string;
+  can_fix: boolean;
+}
+
+async function generateRealPatchWithAI(
+  issueText: string,
+  fileContent: string,
+  filePath: string,
+  failingModule: string,
+): Promise<RealPatchResult | null> {
+  const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+  // Limit file size to prevent token overflow on Groq free tier
+  const truncatedContent = fileContent.slice(0, 8000);
+
+  const systemPrompt = `You are an expert software engineer performing an automated hotfix.
+You will receive a bug report and the content of a source file that likely contains the bug.
+Your task: fix the bug in the source file with minimal, targeted changes.
+
+CRITICAL: Respond ONLY with valid JSON matching this exact schema:
+{
+  "can_fix": <boolean — true if you can confidently identify and fix the bug>,
+  "patched_content": "<complete new file content with the fix applied — FULL FILE, not just the changed part>",
+  "diff_preview": "<unified diff showing changed lines only, max 15 lines, format: -old line / +new line>",
+  "changed_function": "<name of the function or method you changed, or 'config' if it was a config value>"
+}
+
+Rules:
+- If can_fix is false, patched_content and diff_preview can be empty strings
+- Make ONLY the minimal change needed to fix the reported bug
+- The patched_content MUST be the complete file — do not truncate it
+- Preserve all existing formatting, indentation, and style`;
+
+  const userPrompt = `Bug report:
+---
+${issueText.slice(0, 1000)}
+---
+
+File: ${filePath}
+Module: ${failingModule}
+
+File content:
+\`\`\`
+${truncatedContent}
+\`\`\`
+
+Generate the fix.`;
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 4096,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as Partial<RealPatchResult>;
+
+    if (!parsed.can_fix || !parsed.patched_content) return null;
+
+    return {
+      can_fix: true,
+      patched_content: parsed.patched_content,
+      diff_preview: parsed.diff_preview ?? "",
+      changed_function: parsed.changed_function ?? "unknown",
+    };
+  } catch (err) {
+    console.error("[GhostFix] generateRealPatchWithAI error:", err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // POST /api/ingest
 // ---------------------------------------------------------------------------
 
@@ -322,7 +404,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { issue_text, source, user_email } = payload;
+  const { issue_text, source, user_email, team_id } = payload;
 
   if (!issue_text || typeof issue_text !== "string" || !issue_text.trim()) {
     void pendoTrack({
@@ -465,7 +547,65 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ── 6. Update the ticket row with AI results + ghost link ────────────────
+  // ── 6. GitHub real patch + PR (when team has a connected repo) ───────────
+  let githubPrUrl: string | null = null;
+  let realPatchCode: string | null = null;
+
+  if (team_id && triage.auto_patch_viable) {
+    try {
+      const { data: teamRepo } = await supabase
+        .from("team_repos")
+        .select("repo_owner, repo_name, default_branch, github_pat")
+        .eq("team_id", team_id)
+        .single();
+
+      if (teamRepo) {
+        const { repo_owner, repo_name, default_branch, github_pat } = teamRepo as {
+          repo_owner: string; repo_name: string; default_branch: string; github_pat: string;
+        };
+
+        // Find relevant source files by module name
+        const files = await findModuleFiles(github_pat, repo_owner, repo_name, triage.failing_module, default_branch);
+
+        if (files.length > 0) {
+          // Fetch the most relevant file's content
+          const file = await fetchFileContent(github_pat, repo_owner, repo_name, files[0].path);
+
+          // Ask AI to generate a real patch given the actual code
+          const patch = await generateRealPatchWithAI(
+            issue_text.trim(),
+            file.content,
+            file.path,
+            triage.failing_module,
+          );
+
+          if (patch?.can_fix) {
+            // Create branch + commit + PR on GitHub
+            const pr = await createPullRequest({
+              pat: github_pat,
+              owner: repo_owner,
+              repo: repo_name,
+              baseBranch: default_branch,
+              ticketId,
+              filePath: file.path,
+              fileSha: file.sha,
+              patchedContent: patch.patched_content,
+              failingModule: triage.failing_module,
+              fixSummary: triage.fix_summary,
+            });
+            githubPrUrl = pr.url;
+            realPatchCode = patch.diff_preview;
+            console.log(`[GhostFix] ✓ GitHub PR created: ${pr.url}`);
+          }
+        }
+      }
+    } catch (ghErr) {
+      // Non-fatal — fall through to simulated patch
+      console.error("[GhostFix] GitHub integration error (non-fatal):", ghErr);
+    }
+  }
+
+  // ── 7. Update the ticket row with AI results + ghost link ────────────────
   const { error: updateError } = await supabase
     .from("incoming_tickets")
     .update({
@@ -473,6 +613,9 @@ export async function POST(request: NextRequest) {
       failing_module: triage.failing_module,
       triage_summary: triage.fix_summary,
       generated_ghost_link: ghostLink,
+      team_id: team_id ?? null,
+      github_pr_url: githubPrUrl,
+      real_patch_code: realPatchCode,
     })
     .eq("id", ticketId);
 
@@ -523,6 +666,7 @@ export async function POST(request: NextRequest) {
             url: null,
             message: `Confidence score too low (${triage.confidence_score.toFixed(2)}) for automated patching. Ticket escalated to the engineering team for manual review.`,
           },
+      github_pr_url: githubPrUrl,
     },
     { status: 200 }
   );
