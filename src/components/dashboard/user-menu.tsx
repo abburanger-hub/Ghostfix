@@ -48,7 +48,9 @@ export function UserMenu({ email, isAdmin }: UserMenuProps) {
           {email}
         </span>
         {isAdmin && (
-          <Shield className="size-3 text-amber-400" title="Admin" />
+          <span title="Admin">
+            <Shield className="size-3 text-amber-400" />
+          </span>
         )}
         <ChevronDown className="size-3 text-muted-foreground/60" />
       </button>
