@@ -413,7 +413,8 @@ export default async function DashboardPage({
   const userEmail = user?.email ?? "";
   const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
   const isAdmin = adminEmails.includes(userEmail.toLowerCase());
-  const showAll = isAdmin && view === "all";
+  // Admins always see all tickets; non-admins scoped to their teams
+  const showAll = isAdmin;
 
   // ── Fetch tickets ─────────────────────────────────────────────────────────
   let tickets: IncomingTicketRow[] = [];
@@ -611,7 +612,7 @@ export default async function DashboardPage({
                 Live
               </span>
             </div>
-            <SubmitTicketDialog />
+            {!isAdmin && <SubmitTicketDialog />}
             <RefreshButton />
             {userEmail && (
               <UserMenu email={userEmail} isAdmin={isAdmin} />
@@ -716,40 +717,55 @@ export default async function DashboardPage({
                   Incoming Tickets
                 </CardTitle>
                 <CardDescription className="mt-0.5 text-xs">
-                  {isAdmin && !showAll
-                    ? "Showing your teams' tickets only"
-                    : isAdmin && showAll
-                    ? "Admin view — all teams"
+                  {isAdmin
+                    ? teamFilter
+                      ? `Showing tickets for: ${allTeams.find(t => t.id === teamFilter)?.name ?? "selected team"}`
+                      : "Admin view — all teams · all tickets"
                     : "Your teams' tickets"}
                 </CardDescription>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {/* Admin view toggle */}
-                {isAdmin && (
-                  <Link
-                    href={showAll ? "/dashboard" : "/dashboard?view=all"}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      showAll
-                        ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
-                        : "border-border/40 text-muted-foreground/60 hover:border-border hover:text-foreground"
-                    }`}
-                  >
-                    <Shield className="size-3" />
-                    {showAll ? "All Teams (admin)" : "My Teams"}
-                  </Link>
+                {/* Admin: team selector dropdown */}
+                {isAdmin && allTeams.length > 0 && (
+                  <form method="GET" action="/dashboard" className="flex items-center gap-1.5">
+                    <Users className="size-3.5 text-muted-foreground/50" />
+                    <select
+                      name="team"
+                      defaultValue={teamFilter ?? ""}
+                      className="h-8 rounded-lg border border-violet-500/30 bg-violet-500/5 px-2.5 text-xs text-violet-300 outline-none focus-visible:border-violet-500/50"
+                    >
+                      <option value="" className="bg-card text-foreground">All teams</option>
+                      {allTeams.map((t) => (
+                        <option key={t.id} value={t.id} className="bg-card text-foreground">{t.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      className="h-8 rounded-lg border border-violet-500/30 bg-violet-500/8 px-3 text-xs font-medium text-violet-300 transition-colors hover:bg-violet-500/15"
+                    >
+                      View
+                    </button>
+                    {teamFilter && (
+                      <Link
+                        href="/dashboard"
+                        className="h-8 inline-flex items-center rounded-lg border border-border/30 px-2.5 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+                      >
+                        Clear
+                      </Link>
+                    )}
+                  </form>
                 )}
 
-                {/* Team filter dropdown */}
-                {allTeams.length > 1 && (
+                {/* Non-admin: team filter if in multiple teams */}
+                {!isAdmin && allTeams.length > 1 && (
                   <form method="GET" action="/dashboard" className="flex items-center gap-1.5">
-                    {showAll && <input type="hidden" name="view" value="all" />}
                     <select
                       name="team"
                       defaultValue={teamFilter ?? ""}
                       className="h-8 rounded-lg border border-border/40 bg-transparent px-2.5 text-xs text-muted-foreground outline-none focus-visible:border-ring"
                     >
-                      <option value="">All projects</option>
+                      <option value="">All my teams</option>
                       {allTeams.map((t) => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
