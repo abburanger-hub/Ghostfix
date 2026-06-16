@@ -123,13 +123,18 @@ function LoginContent() {
             )}
 
             {/* Submit */}
+            {loading && (
+              <div className="h-[2px] w-full overflow-hidden rounded-full bg-indigo-500/20">
+                <div className="h-full animate-[progress_1.2s_ease-in-out_infinite] bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500 bg-[length:200%_100%]" />
+              </div>
+            )}
             <button
               type="submit"
               disabled={loading || !email || !password}
               className="w-full h-10 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-              Sign In
+              {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
 

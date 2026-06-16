@@ -47,7 +47,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  Activity,
   ArrowUpRight,
   Cpu,
   Shield,
@@ -591,17 +590,6 @@ export default async function DashboardPage({
               <Users className="size-3" />
               Teams
             </Link>
-            {total > 0 && (
-              <div className="hidden items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-3 py-1.5 sm:flex">
-                <Activity className="size-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">
-                  <span className="font-semibold text-foreground">
-                    {patchRate}%
-                  </span>{" "}
-                  auto-patch rate
-                </span>
-              </div>
-            )}
             {!isAdmin && <SubmitTicketDialog />}
             {userEmail && (
               <UserMenu email={userEmail} isAdmin={isAdmin} />
@@ -722,24 +710,7 @@ export default async function DashboardPage({
 
                 {/* Non-admin: team filter if in multiple teams */}
                 {!isAdmin && allTeams.length > 1 && (
-                  <form method="GET" action="/dashboard" className="flex items-center gap-1.5">
-                    <select
-                      name="team"
-                      defaultValue={teamFilter ?? ""}
-                      className="h-8 rounded-lg border border-border/40 bg-transparent px-2.5 text-xs text-muted-foreground outline-none focus-visible:border-ring"
-                    >
-                      <option value="">All my teams</option>
-                      {allTeams.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="submit"
-                      className="h-8 rounded-lg border border-border/40 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
-                    >
-                      Filter
-                    </button>
-                  </form>
+                  <TeamFilterSelect teams={allTeams} defaultValue={teamFilter ?? ""} />
                 )}
 
                 {/* Engine label */}
