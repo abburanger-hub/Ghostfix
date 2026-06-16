@@ -173,12 +173,14 @@ function TeamCard({
 
   // localRepo: optimistic — set immediately on successful connect so the
   // header badge shows right away (before parent re-fetch completes).
+  // IMPORTANT: never clear localRepo from a parent re-render that returns
+  // empty team_repos (race condition vs. DB write). Only update when confirmed data arrives.
   const [localRepo, setLocalRepo] = useState<TeamRepo | undefined>(team.team_repos?.[0]);
   useEffect(() => {
-    setLocalRepo(team.team_repos?.[0]);
-    // Sync form inputs when parent data refreshes
     const r = team.team_repos?.[0];
     if (r) {
+      // Parent has confirmed repo data — sync everything
+      setLocalRepo(r);
       setRepoOwner(r.repo_owner);
       setRepoName(r.repo_name);
       setBranch(r.default_branch);
