@@ -124,18 +124,18 @@ function TeamCard({ team, onUpdated }: { team: Team; onUpdated: () => void }) {
   const [memberOk, setMemberOk] = useState(false);
 
   // Repo form
-  const [repoOwner, setRepoOwner] = useState(team.team_repos[0]?.repo_owner ?? "");
-  const [repoName, setRepoName] = useState(team.team_repos[0]?.repo_name ?? "");
-  const [branch, setBranch] = useState(team.team_repos[0]?.default_branch ?? "main");
+  const [repoOwner, setRepoOwner] = useState(team.team_repos?.[0]?.repo_owner ?? "");
+  const [repoName, setRepoName] = useState(team.team_repos?.[0]?.repo_name ?? "");
+  const [branch, setBranch] = useState(team.team_repos?.[0]?.default_branch ?? "main");
   const [pat, setPat] = useState("");
   const [modulesRaw, setModulesRaw] = useState(
-    (team.team_repos[0]?.modules ?? []).join(", ")
+    (team.team_repos?.[0]?.modules ?? []).join(", ")
   );
   const [repoLoading, setRepoLoading] = useState(false);
   const [repoError, setRepoError] = useState("");
   const [repoOk, setRepoOk] = useState(false);
 
-  const repo = team.team_repos[0];
+  const repo = team.team_repos?.[0];
 
   async function addMember(e: React.FormEvent) {
     e.preventDefault();
@@ -201,7 +201,7 @@ function TeamCard({ team, onUpdated }: { team: Team; onUpdated: () => void }) {
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm">{team.name}</p>
           <p className="text-[11px] text-muted-foreground/60 mt-0.5">
-            {team.team_members.length} member{team.team_members.length !== 1 ? "s" : ""}
+            {(team.team_members ?? []).length} member{(team.team_members ?? []).length !== 1 ? "s" : ""}
             {" · "}
             {repo
               ? <span className="text-emerald-400">{repo.repo_owner}/{repo.repo_name}</span>
@@ -244,7 +244,7 @@ function TeamCard({ team, onUpdated }: { team: Team; onUpdated: () => void }) {
             </div>
             {/* Member list */}
             <div className="space-y-1.5">
-              {team.team_members.map((m) => (
+              {(team.team_members ?? []).map((m) => (
                 <div key={m.id} className="flex items-center gap-2 rounded-lg border border-border/30 bg-muted/10 px-3 py-2">
                   <div className="size-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[9px] font-bold text-indigo-300 uppercase shrink-0">
                     {m.email[0]}
@@ -402,8 +402,8 @@ export default function TeamsPage() {
 
   useEffect(() => { fetchTeams(); }, [fetchTeams]);
 
-  function handleCreated(team: Team) {
-    setTeams((prev) => [team, ...prev]);
+  function handleCreated(_team: Team) {
+    fetchTeams();
     setShowCreate(false);
   }
 
