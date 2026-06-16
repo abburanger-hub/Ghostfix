@@ -44,31 +44,25 @@ function timeAgo(iso: string) {
 // ---------------------------------------------------------------------------
 // Sub: Create Team Form
 // ---------------------------------------------------------------------------
-function CreateTeamForm({ onCreated }: { onCreated: (team: Team) => void }) {
+type GFUser = { id: string; email: string; job_role: string };
+
+function CreateTeamForm({ onCreated, users }: { onCreated: (team: Team) => void; users: GFUser[] }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Fetch signed-up users for the owner dropdown
+  // Pre-select stored visitor email when users list arrives
   useEffect(() => {
-    fetch("/api/users")
-      .then((r) => r.json())
-      .then((d: { users?: { id: string; email: string }[] }) => {
-        const list = d.users ?? [];
-        setUsers(list);
-        // Pre-select the stored visitor email if it's in the list
-        try {
-          const stored = localStorage.getItem("gf_visitor_email") ?? "";
-          if (stored && list.some((u) => u.email === stored)) setEmail(stored);
-          else if (list.length > 0) setEmail(list[0].email);
-        } catch (_) {
-          if (list.length > 0) setEmail(list[0].email);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    if (users.length === 0) return;
+    try {
+      const stored = localStorage.getItem("gf_visitor_email") ?? "";
+      if (stored && users.some((u) => u.email === stored)) setEmail(stored);
+      else setEmail(users[0].email);
+    } catch (_) {
+      setEmail(users[0].email);
+    }
+  }, [users]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -111,7 +105,7 @@ function CreateTeamForm({ onCreated }: { onCreated: (team: Team) => void }) {
           >
             {users.map((u) => (
               <option key={u.id} value={u.email} className="bg-card text-foreground">
-                {u.email}
+                {u.email}{u.job_role ? ` — ${u.job_role}` : ""}
               </option>
             ))}
           </select>
@@ -142,7 +136,7 @@ function CreateTeamForm({ onCreated }: { onCreated: (team: Team) => void }) {
 // ---------------------------------------------------------------------------
 // Sub: Team Card (expandable — members + repo sections)
 // ---------------------------------------------------------------------------
-function TeamCard({ team, onUpdated }: { team: Team; onUpdated: () => void }) {
+function TeamCard({ team, onUpdated, usersMap }: { team: Team; onUpdated: () => void; usersMap: Record<string, string> }) {
   const [expanded, setExpanded] = useState(false);
 
   // Member form
@@ -278,6 +272,11 @@ function TeamCard({ team, onUpdated }: { team: Team; onUpdated: () => void }) {
                     {m.email[0]}
                   </div>
                   <span className="min-w-0 flex-1 truncate text-xs text-foreground/80">{m.email}</span>
+                  {usersMap[m.email] && (
+                    <span className="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-500/8 px-2 py-0.5 text-[10px] font-medium text-indigo-300 hidden sm:inline">
+                      {usersMap[m.email]}
+                    </span>
+                  )}
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                     m.role === "owner"
                       ? "bg-amber-500/10 text-amber-400"
@@ -414,6 +413,7 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [users, setUsers] = useState<GFUser[]>([]);
 
   const fetchTeams = useCallback(async () => {
     try {
@@ -428,7 +428,15 @@ export default function TeamsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchTeams(); }, [fetchTeams]);
+  useEffect(() => {
+    fetchTeams();
+    fetch("/api/users")
+      .then((r) => r.json())
+      .then((d: { users?: GFUser[] }) => setUsers(d.users ?? []))
+      .catch(() => {});
+  }, [fetchTeams]);
+
+  const usersMap = Object.fromEntries(users.map((u) => [u.email, u.job_role]));
 
   function handleCreated(_team: Team) {
     fetchTeams();
@@ -505,7 +513,7 @@ export default function TeamsPage() {
         {/* Create form */}
         {showCreate && (
           <div className="mb-6">
-            <CreateTeamForm onCreated={handleCreated} />
+            <CreateTeamForm onCreated={handleCreated} users={users} />
           </div>
         )}
 
@@ -549,7 +557,7 @@ export default function TeamsPage() {
         {!loading && teams.length > 0 && (
           <div className="space-y-4">
             {teams.map((team) => (
-              <TeamCard key={team.id} team={team} onUpdated={fetchTeams} />
+              <TeamCard key={team.id} team={team} onUpdated={fetchTeams} usersMap={usersMap} />
             ))}
           </div>
         )}

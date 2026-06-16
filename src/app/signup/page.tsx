@@ -14,6 +14,7 @@ function SignupContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [jobRole, setJobRole] = useState("Software Developer");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +42,7 @@ function SignupContent() {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}${next}`,
+          data: { job_role: jobRole },
         },
       });
       if (authError) throw authError;
@@ -126,6 +128,34 @@ function SignupContent() {
                   className="h-10 w-full rounded-lg border border-input bg-transparent pl-9 pr-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                 />
               </div>
+            </div>
+
+            {/* Role */}
+            <div className="space-y-1.5">
+              <label htmlFor="role" className="text-xs font-medium text-muted-foreground">
+                Your Role
+              </label>
+              <select
+                id="role"
+                value={jobRole}
+                onChange={(e) => setJobRole(e.target.value)}
+                required
+                className="h-10 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              >
+                <option value="Software Developer">Software Developer</option>
+                <option value="Backend Engineer">Backend Engineer</option>
+                <option value="Frontend Engineer">Frontend Engineer</option>
+                <option value="Full Stack Engineer">Full Stack Engineer</option>
+                <option value="DevOps Engineer">DevOps Engineer</option>
+                <option value="Platform Engineer">Platform Engineer</option>
+                <option value="SRE">SRE (Site Reliability Engineer)</option>
+                <option value="Tech Lead">Tech Lead</option>
+                <option value="Engineering Manager">Engineering Manager</option>
+                <option value="UI/UX Designer">UI/UX Designer</option>
+                <option value="QA Engineer">QA Engineer</option>
+                <option value="Data Engineer">Data Engineer</option>
+                <option value="Security Engineer">Security Engineer</option>
+              </select>
             </div>
 
             {/* Password */}

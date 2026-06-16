@@ -12,7 +12,11 @@ export async function GET() {
 
     const users = (data.users ?? [])
       .filter((u) => !!u.email)
-      .map((u) => ({ id: u.id, email: u.email! }))
+      .map((u) => ({
+        id: u.id,
+        email: u.email!,
+        job_role: (u.user_metadata?.job_role as string | undefined) ?? "",
+      }))
       .sort((a, b) => a.email.localeCompare(b.email));
 
     return NextResponse.json({ users });
