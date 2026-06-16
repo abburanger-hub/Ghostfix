@@ -31,8 +31,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import RefreshButton from "@/components/dashboard/refresh-button";
 import SubmitTicketDialog from "@/components/dashboard/submit-ticket-dialog";
+import { TeamFilterSelect } from "@/components/dashboard/team-filter-select";
 import PendoDashboardTracker from "@/components/dashboard/pendo-tracker";
 import ScrollToHighlight from "@/components/dashboard/scroll-to-highlight";
 import Link from "next/link";
@@ -602,18 +602,7 @@ export default async function DashboardPage({
                 </span>
               </div>
             )}
-            {/* Live indicator */}
-            <div className="flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-3 py-1.5">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-xs font-medium text-emerald-400">
-                Live
-              </span>
-            </div>
             {!isAdmin && <SubmitTicketDialog />}
-            <RefreshButton />
             {userEmail && (
               <UserMenu email={userEmail} isAdmin={isAdmin} />
             )}
@@ -726,35 +715,9 @@ export default async function DashboardPage({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {/* Admin: team selector dropdown */}
+                {/* Admin: team selector — auto-submits on change */}
                 {isAdmin && allTeams.length > 0 && (
-                  <form method="GET" action="/dashboard" className="flex items-center gap-1.5">
-                    <Users className="size-3.5 text-muted-foreground/50" />
-                    <select
-                      name="team"
-                      defaultValue={teamFilter ?? ""}
-                      className="h-8 rounded-lg border border-violet-500/30 bg-violet-500/5 px-2.5 text-xs text-violet-300 outline-none focus-visible:border-violet-500/50"
-                    >
-                      <option value="" className="bg-card text-foreground">All teams</option>
-                      {allTeams.map((t) => (
-                        <option key={t.id} value={t.id} className="bg-card text-foreground">{t.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="submit"
-                      className="h-8 rounded-lg border border-violet-500/30 bg-violet-500/8 px-3 text-xs font-medium text-violet-300 transition-colors hover:bg-violet-500/15"
-                    >
-                      View
-                    </button>
-                    {teamFilter && (
-                      <Link
-                        href="/dashboard"
-                        className="h-8 inline-flex items-center rounded-lg border border-border/30 px-2.5 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
-                      >
-                        Clear
-                      </Link>
-                    )}
-                  </form>
+                  <TeamFilterSelect teams={allTeams} defaultValue={teamFilter ?? ""} />
                 )}
 
                 {/* Non-admin: team filter if in multiple teams */}
