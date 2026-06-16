@@ -7,13 +7,14 @@
 // No auth needed — owner email is pre-filled from localStorage.
 // =============================================================================
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Ghost, Users, GitBranch, Plus, Trash2, ChevronDown, ChevronUp,
   CheckCircle2, AlertTriangle, Loader2, ArrowLeft, ExternalLink,
   Code2, Settings, UserPlus, Shield,
 } from "lucide-react";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 // ---------------------------------------------------------------------------
 // Types (mirror API response shape)
@@ -136,28 +137,56 @@ function CreateTeamForm({ onCreated, users }: { onCreated: (team: Team) => void;
 // ---------------------------------------------------------------------------
 // Sub: Team Card (expandable — members + repo sections)
 // ---------------------------------------------------------------------------
-function TeamCard({ team, onUpdated, usersMap }: { team: Team; onUpdated: () => void; usersMap: Record<string, string> }) {
+function TeamCard({
+  team, onUpdated, usersMap, users, currentUserEmail,
+}: {
+  team: Team;
+  onUpdated: () => void;
+  usersMap: Record<string, string>;
+  users: GFUser[];
+  currentUserEmail: string;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const isOwner = !!currentUserEmail && currentUserEmail === team.owner_email;
 
-  // Member form
+  // ── Member form ──────────────────────────────────────────────────────────
   const [memberEmail, setMemberEmail] = useState("");
   const [memberLoading, setMemberLoading] = useState(false);
   const [memberError, setMemberError] = useState("");
   const [memberOk, setMemberOk] = useState(false);
 
-  // Repo form
+  // Users not already in this team (for dropdown)
+  const existingEmails = new Set((team.team_members ?? []).map((m) => m.email));
+  const availableUsers = users.filter((u) => !existingEmails.has(u.email));
+
+  // ── Repo form ────────────────────────────────────────────────────────────
   const [repoOwner, setRepoOwner] = useState(team.team_repos?.[0]?.repo_owner ?? "");
   const [repoName, setRepoName] = useState(team.team_repos?.[0]?.repo_name ?? "");
   const [branch, setBranch] = useState(team.team_repos?.[0]?.default_branch ?? "main");
   const [pat, setPat] = useState("");
   const [modulesRaw, setModulesRaw] = useState(
-    (team.team_repos?.[0]?.modules ?? []).join(", ")
+    (team.team_repos?.[0]?.modules ?? []).join(", "),
   );
   const [repoLoading, setRepoLoading] = useState(false);
   const [repoError, setRepoError] = useState("");
   const [repoOk, setRepoOk] = useState(false);
 
-  const repo = team.team_repos?.[0];
+  // localRepo: optimistic — set immediately on successful connect so the
+  // header badge shows right away (before parent re-fetch completes).
+  const [localRepo, setLocalRepo] = useState<TeamRepo | undefined>(team.team_repos?.[0]);
+  useEffect(() => {
+    setLocalRepo(team.team_repos?.[0]);
+    // Sync form inputs when parent data refreshes
+    const r = team.team_repos?.[0];
+    if (r) {
+      setRepoOwner(r.repo_owner);
+      setRepoName(r.repo_name);
+      setBranch(r.default_branch);
+      setModulesRaw((r.modules ?? []).join(", "));
+    }
+  }, [team.team_repos]);
+
+  const repo = localRepo;
 
   async function addMember(e: React.FormEvent) {
     e.preventDefault();
@@ -205,6 +234,15 @@ function TeamCard({ team, onUpdated, usersMap }: { team: Team; onUpdated: () => 
       });
       const data = await res.json() as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to connect repo");
+      // Optimistically mark as connected — visible immediately in header
+      setLocalRepo({
+        id: "pending",
+        repo_owner: repoOwner.trim(),
+        repo_name: repoName.trim(),
+        default_branch: branch.trim() || "main",
+        modules,
+        created_at: new Date().toISOString(),
+      });
       setRepoOk(true);
       setTimeout(() => setRepoOk(false), 3000);
       onUpdated();
@@ -221,19 +259,29 @@ function TeamCard({ team, onUpdated, usersMap }: { team: Team; onUpdated: () => 
           <Users className="size-5 text-white" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm">{team.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-sm">{team.name}</p>
+            {repo ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                <CheckCircle2 className="size-2.5" /> Repo Connected
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/8 px-2 py-0.5 text-[10px] font-medium text-amber-400/80">
+                No repo
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-muted-foreground/60 mt-0.5">
             {(team.team_members ?? []).length} member{(team.team_members ?? []).length !== 1 ? "s" : ""}
-            {" · "}
-            {repo
-              ? <span className="text-emerald-400">{repo.repo_owner}/{repo.repo_name}</span>
-              : <span className="text-amber-400/80">No repo connected</span>}
+            {repo && (
+              <> · <span className="text-emerald-400/80">{repo.repo_owner}/{repo.repo_name}</span></>
+            )}
             {" · created "}{timeAgo(team.created_at)}
           </p>
         </div>
-        {/* Tags */}
+        {/* GitHub link tag */}
         <div className="hidden sm:flex items-center gap-2">
-          {repo && (
+          {repo && repo.id !== "pending" && (
             <a
               href={`https://github.com/${repo.repo_owner}/${repo.repo_name}`}
               target="_blank"
@@ -282,7 +330,7 @@ function TeamCard({ team, onUpdated, usersMap }: { team: Team; onUpdated: () => 
                       ? "bg-amber-500/10 text-amber-400"
                       : "bg-zinc-500/10 text-zinc-400"
                   }`}>{m.role}</span>
-                  {m.role !== "owner" && (
+                  {m.role !== "owner" && isOwner && (
                     <button
                       onClick={() => removeMember(m.email)}
                       className="shrink-0 text-muted-foreground/30 hover:text-red-400 transition-colors"
@@ -294,27 +342,53 @@ function TeamCard({ team, onUpdated, usersMap }: { team: Team; onUpdated: () => 
                 </div>
               ))}
             </div>
-            {/* Add member form */}
-            <form onSubmit={addMember} className="flex gap-2">
-              <input
-                value={memberEmail}
-                onChange={(e) => setMemberEmail(e.target.value)}
-                type="email"
-                placeholder="colleague@company.com"
-                className="h-8 flex-1 rounded-lg border border-input bg-transparent px-3 text-xs outline-none focus-visible:border-ring"
-                required
-              />
-              <button
-                type="submit"
-                disabled={memberLoading}
-                className="inline-flex h-8 items-center gap-1 rounded-lg bg-indigo-600/80 px-3 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
-              >
-                {memberLoading ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
-                Add
-              </button>
-            </form>
-            {memberError && <p className="text-[11px] text-red-400">{memberError}</p>}
-            {memberOk && <p className="text-[11px] text-emerald-400 flex items-center gap-1"><CheckCircle2 className="size-3" /> Member added!</p>}
+            {/* Add member — owner only */}
+            {isOwner && (
+              <>
+                <form onSubmit={addMember} className="flex gap-2">
+                  {availableUsers.length > 0 ? (
+                    <select
+                      value={memberEmail}
+                      onChange={(e) => setMemberEmail(e.target.value)}
+                      className="h-8 flex-1 rounded-lg border border-input bg-card px-3 text-xs text-foreground outline-none focus-visible:border-ring"
+                      required
+                    >
+                      <option value="">Select member to add…</option>
+                      {availableUsers.map((u) => (
+                        <option key={u.id} value={u.email} className="bg-card text-foreground">
+                          {u.email}{u.job_role ? ` — ${u.job_role}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={memberEmail}
+                      onChange={(e) => setMemberEmail(e.target.value)}
+                      type="email"
+                      placeholder="colleague@company.com"
+                      className="h-8 flex-1 rounded-lg border border-input bg-transparent px-3 text-xs outline-none focus-visible:border-ring"
+                      required
+                    />
+                  )}
+                  <button
+                    type="submit"
+                    disabled={memberLoading || !memberEmail}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg bg-indigo-600/80 px-3 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
+                  >
+                    {memberLoading ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
+                    Add
+                  </button>
+                </form>
+                {memberError && <p className="text-[11px] text-red-400">{memberError}</p>}
+                {memberOk && <p className="text-[11px] text-emerald-400 flex items-center gap-1"><CheckCircle2 className="size-3" /> Member added!</p>}
+              </>
+            )}
+            {!isOwner && !currentUserEmail && (
+              <p className="text-[11px] text-muted-foreground/40">Sign in to manage members.</p>
+            )}
+            {!isOwner && currentUserEmail && (
+              <p className="text-[11px] text-muted-foreground/40">Only the team owner can add or remove members.</p>
+            )}
           </div>
 
           {/* ── GitHub Repo section ── */}
@@ -414,6 +488,9 @@ export default function TeamsPage() {
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [users, setUsers] = useState<GFUser[]>([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
+
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const fetchTeams = useCallback(async () => {
     try {
@@ -434,7 +511,10 @@ export default function TeamsPage() {
       .then((r) => r.json())
       .then((d: { users?: GFUser[] }) => setUsers(d.users ?? []))
       .catch(() => {});
-  }, [fetchTeams]);
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email ?? "");
+    });
+  }, [fetchTeams, supabase]);
 
   const usersMap = Object.fromEntries(users.map((u) => [u.email, u.job_role]));
 
@@ -557,7 +637,7 @@ export default function TeamsPage() {
         {!loading && teams.length > 0 && (
           <div className="space-y-4">
             {teams.map((team) => (
-              <TeamCard key={team.id} team={team} onUpdated={fetchTeams} usersMap={usersMap} />
+              <TeamCard key={team.id} team={team} onUpdated={fetchTeams} usersMap={usersMap} users={users} currentUserEmail={currentUserEmail} />
             ))}
           </div>
         )}
