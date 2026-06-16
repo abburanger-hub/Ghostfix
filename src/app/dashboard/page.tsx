@@ -13,6 +13,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createSessionSupabaseClient } from "@/lib/supabase/session";
+import { UserMenu } from "@/components/dashboard/user-menu";
 import type { IncomingTicketRow, TicketStatus } from "@/lib/supabase/types";
 import {
   Card,
@@ -400,10 +402,18 @@ const PAGE_SIZE = 10;
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; highlight?: string }>;
+  searchParams: Promise<{ page?: string; highlight?: string; team?: string; view?: string }>;
 }) {
-  const { page: pageParam, highlight } = await searchParams;
+  const { page: pageParam, highlight, team: teamFilter, view } = await searchParams;
   const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+
+  // ── Auth: get current user + admin check ──────────────────────────────────
+  const sessionClient = await createSessionSupabaseClient();
+  const { data: { user } } = await sessionClient.auth.getUser();
+  const userEmail = user?.email ?? "";
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  const isAdmin = adminEmails.includes(userEmail.toLowerCase());
+  const showAll = isAdmin && view === "all";
 
   // ── Fetch tickets ─────────────────────────────────────────────────────────
   let tickets: IncomingTicketRow[] = [];
@@ -413,6 +423,7 @@ export default async function DashboardPage({
   let statEscalated = 0;
   let fetchError = false;
   let isDemo = false;
+  let allTeams: { id: string; name: string }[] = [];
 
   const hasRealKeys =
     process.env.SUPABASE_URL &&
@@ -432,29 +443,60 @@ export default async function DashboardPage({
     try {
       const supabase = createServerSupabaseClient();
 
-      // Run all 4 count queries in parallel for accurate stats across ALL pages
+      // Determine which team_ids this user belongs to (for non-admin users)
+      let userTeamIds: string[] | null = null;
+      if (!showAll) {
+        const { data: memberRows } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("email", userEmail);
+        userTeamIds = (memberRows ?? []).map((r: { team_id: string }) => r.team_id);
+      }
+
+      // Build base query filters
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function applyFilters(q: any): any {
+        if (userTeamIds !== null) {
+          // Non-admin: only see tickets from their teams (or their own submissions)
+          if (userTeamIds.length > 0) {
+            q = q.or(
+              `team_id.in.(${userTeamIds.join(",")}),user_email.eq.${userEmail}`
+            );
+          } else {
+            // Not in any team yet — only see their own tickets
+            q = q.eq("user_email", userEmail);
+          }
+        }
+        // Team filter dropdown
+        if (teamFilter) {
+          q = q.eq("team_id", teamFilter);
+        }
+        return q;
+      }
+
+      // Run counts in parallel
       const [
         { count: allCount },
         { count: patchedCount },
         { count: pipelineCount },
         { count: escalatedCount },
       ] = await Promise.all([
-        supabase.from("incoming_tickets").select("*", { count: "exact", head: true }),
-        supabase.from("incoming_tickets").select("*", { count: "exact", head: true }).in("status", ["patched", "resolved"]),
-        supabase.from("incoming_tickets").select("*", { count: "exact", head: true }).in("status", ["pending", "analyzing"]),
-        supabase.from("incoming_tickets").select("*", { count: "exact", head: true }).eq("status", "escalated"),
+        applyFilters(supabase.from("incoming_tickets").select("*", { count: "exact", head: true })),
+        applyFilters(supabase.from("incoming_tickets").select("*", { count: "exact", head: true })).in("status", ["patched", "resolved"]),
+        applyFilters(supabase.from("incoming_tickets").select("*", { count: "exact", head: true })).in("status", ["pending", "analyzing"]),
+        applyFilters(supabase.from("incoming_tickets").select("*", { count: "exact", head: true })).eq("status", "escalated"),
       ]);
-      totalCount   = allCount     ?? 0;
-      statPatched  = patchedCount  ?? 0;
-      statPipeline = pipelineCount ?? 0;
+      totalCount    = allCount      ?? 0;
+      statPatched   = patchedCount  ?? 0;
+      statPipeline  = pipelineCount ?? 0;
       statEscalated = escalatedCount ?? 0;
 
-      // Then fetch just this page
+      // Fetch current page
       const from = (currentPage - 1) * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
-      const { data, error } = await supabase
-        .from("incoming_tickets")
-        .select("*")
+      const { data, error } = await applyFilters(
+        supabase.from("incoming_tickets").select("*")
+      )
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -462,6 +504,15 @@ export default async function DashboardPage({
         fetchError = true;
       } else {
         tickets = (data as IncomingTicketRow[]) ?? [];
+      }
+
+      // Fetch teams for filter dropdown
+      if (isAdmin) {
+        const { data: teamRows } = await supabase.from("teams").select("id, name").order("name");
+        allTeams = (teamRows ?? []) as { id: string; name: string }[];
+      } else if (userTeamIds && userTeamIds.length > 0) {
+        const { data: teamRows } = await supabase.from("teams").select("id, name").in("id", userTeamIds).order("name");
+        allTeams = (teamRows ?? []) as { id: string; name: string }[];
       }
     } catch {
       fetchError = true;
@@ -562,6 +613,9 @@ export default async function DashboardPage({
             </div>
             <SubmitTicketDialog />
             <RefreshButton />
+            {userEmail && (
+              <UserMenu email={userEmail} isAdmin={isAdmin} />
+            )}
           </div>
         </div>
       </header>
@@ -656,18 +710,64 @@ export default async function DashboardPage({
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
           {/* Card header */}
           <CardHeader className="border-b border-border/40 px-6 pb-4 pt-5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-base font-semibold">
                   Incoming Tickets
                 </CardTitle>
                 <CardDescription className="mt-0.5 text-xs">
-                  Live feed from any source · Triaged by GhostFix AI
+                  {isAdmin && !showAll
+                    ? "Showing your teams' tickets only"
+                    : isAdmin && showAll
+                    ? "Admin view — all teams"
+                    : "Your teams' tickets"}
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                <Cpu className="size-3.5" />
-                <span>Llama 3.3 · Groq</span>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Admin view toggle */}
+                {isAdmin && (
+                  <Link
+                    href={showAll ? "/dashboard" : "/dashboard?view=all"}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      showAll
+                        ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
+                        : "border-border/40 text-muted-foreground/60 hover:border-border hover:text-foreground"
+                    }`}
+                  >
+                    <Shield className="size-3" />
+                    {showAll ? "All Teams (admin)" : "My Teams"}
+                  </Link>
+                )}
+
+                {/* Team filter dropdown */}
+                {allTeams.length > 1 && (
+                  <form method="GET" action="/dashboard" className="flex items-center gap-1.5">
+                    {showAll && <input type="hidden" name="view" value="all" />}
+                    <select
+                      name="team"
+                      defaultValue={teamFilter ?? ""}
+                      className="h-8 rounded-lg border border-border/40 bg-transparent px-2.5 text-xs text-muted-foreground outline-none focus-visible:border-ring"
+                    >
+                      <option value="">All projects</option>
+                      {allTeams.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      className="h-8 rounded-lg border border-border/40 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
+                    >
+                      Filter
+                    </button>
+                  </form>
+                )}
+
+                {/* Engine label */}
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                  <Cpu className="size-3.5" />
+                  <span>Llama 3.3 · Groq</span>
+                </div>
               </div>
             </div>
           </CardHeader>
