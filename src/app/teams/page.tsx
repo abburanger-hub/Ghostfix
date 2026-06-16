@@ -47,14 +47,27 @@ function timeAgo(iso: string) {
 function CreateTeamForm({ onCreated }: { onCreated: (team: Team) => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Fetch signed-up users for the owner dropdown
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("gf_visitor_email") ?? "";
-      if (stored) setEmail(stored);
-    } catch (_) {}
+    fetch("/api/users")
+      .then((r) => r.json())
+      .then((d: { users?: { id: string; email: string }[] }) => {
+        const list = d.users ?? [];
+        setUsers(list);
+        // Pre-select the stored visitor email if it's in the list
+        try {
+          const stored = localStorage.getItem("gf_visitor_email") ?? "";
+          if (stored && list.some((u) => u.email === stored)) setEmail(stored);
+          else if (list.length > 0) setEmail(list[0].email);
+        } catch (_) {
+          if (list.length > 0) setEmail(list[0].email);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -89,14 +102,29 @@ function CreateTeamForm({ onCreated }: { onCreated: (team: Team) => void }) {
           className="h-9 flex-1 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring"
           required
         />
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          type="email"
-          placeholder="Your email (owner)"
-          className="h-9 flex-1 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring"
-          required
-        />
+        {users.length > 0 ? (
+          <select
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-9 flex-1 rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring"
+            required
+          >
+            {users.map((u) => (
+              <option key={u.id} value={u.email} className="bg-card text-foreground">
+                {u.email}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            placeholder="Owner email"
+            className="h-9 flex-1 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring"
+            required
+          />
+        )}
         <button
           type="submit"
           disabled={loading}
