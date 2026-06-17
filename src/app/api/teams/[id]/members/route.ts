@@ -1,6 +1,8 @@
 // POST /api/teams/[id]/members   — add a member by email
 // DELETE /api/teams/[id]/members — remove a member by email
 
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 

@@ -252,8 +252,7 @@ function TeamCard({
       }
       setRepoOk(true);
       setTimeout(() => setRepoOk(false), 3000);
-      // Delay parent re-fetch slightly to let DB flush the write
-      setTimeout(() => onUpdated(), 800);
+      onUpdated();
     } catch (err) {
       setRepoError(err instanceof Error ? err.message : "Error");
     } finally { setRepoLoading(false); }

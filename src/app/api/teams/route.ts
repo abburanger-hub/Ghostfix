@@ -1,6 +1,8 @@
 // GET /api/teams         — list all teams (with members + repo)
 // POST /api/teams        — create a new team
 
+export const dynamic = "force-dynamic"; // never cache — Supabase reads must be fresh
+
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
