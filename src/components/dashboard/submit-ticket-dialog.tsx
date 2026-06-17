@@ -454,6 +454,13 @@ export default function SubmitTicketDialog({
   const selectedTeam = teams.find((t) => t.id === teamId);
   const teamModules = selectedTeam?.modules ?? [];
 
+  // Auto-select first team when list loads
+  useEffect(() => {
+    if (teams.length > 0 && !teamId) {
+      setTeamId(teams[0].id);
+    }
+  }, [teams, teamId]);
+
   // Fetch teams when dialog opens
   useEffect(() => {
     if (!open) return;
@@ -684,7 +691,7 @@ export default function SubmitTicketDialog({
                   id="source"
                   value={source}
                   onChange={(e) => setSource(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
+                  className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                 >
                   {SOURCES.map((s) => (
                     <option key={s} value={s} className="bg-card text-foreground">
@@ -717,7 +724,7 @@ export default function SubmitTicketDialog({
                 </Label>
                 <Textarea
                   id="issue"
-                  placeholder="Describe the bug in detail — e.g. 'Dashboard is returning 504 errors since the last deployment. All EU users affected.'"
+                  placeholder="Describe the bug in detail. e.g. Dashboard is returning 504 errors since the last deployment. All EU users affected."
                   value={issueText}
                   onChange={(e) => setIssueText(e.target.value)}
                   required
@@ -729,30 +736,28 @@ export default function SubmitTicketDialog({
                 </p>
               </div>
 
-              {/* Team selector — optional, enables real GitHub PR creation */}
+              {/* Team selector */}
               {teams.length > 0 && (
                 <div className="space-y-1.5">
                   <Label htmlFor="team" className="text-xs text-muted-foreground">
-                    Team{" "}
-                    <span className="text-muted-foreground/40">(optional)</span>
+                    Team
                   </Label>
                   <select
                     id="team"
                     value={teamId}
                     onChange={(e) => { setTeamId(e.target.value); setModuleSelected(""); }}
-                    className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
+                    className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                   >
-                    <option value="" className="bg-card text-foreground">No team — standard triage</option>
                     {teams.map((t) => (
                       <option key={t.id} value={t.id} className="bg-card text-foreground">
-                        {t.name}{t.has_repo ? " ⚡ real PR" : ""}
+                        {t.name}
                       </option>
                     ))}
                   </select>
                   {selectedTeam?.has_repo && (
                     <p className="flex items-center gap-1 text-[10px] text-emerald-400/70">
                       <GitBranch className="size-3" />
-                      GhostFix will open a real pull request on your GitHub repo.
+                      Real pull request will be opened on your GitHub repo.
                     </p>
                   )}
                 </div>

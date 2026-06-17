@@ -106,7 +106,7 @@ function CreateTeamForm({ onCreated, users }: { onCreated: (team: Team) => void;
           >
             {users.map((u) => (
               <option key={u.id} value={u.email} className="bg-card text-foreground">
-                {u.email}{u.job_role ? ` — ${u.job_role}` : ""}
+                {u.email}{u.job_role ? ` · ${u.job_role}` : ""}
               </option>
             ))}
           </select>
@@ -116,7 +116,7 @@ function CreateTeamForm({ onCreated, users }: { onCreated: (team: Team) => void;
             onChange={(e) => setEmail(e.target.value)}
             type="email"
             placeholder="Owner email"
-            className="h-9 flex-1 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring"
+            className="h-9 flex-1 rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring"
             required
           />
         )}
@@ -363,7 +363,7 @@ function TeamCard({
                       <option value="">Select member to add…</option>
                       {availableUsers.map((u) => (
                         <option key={u.id} value={u.email} className="bg-card text-foreground">
-                          {u.email}{u.job_role ? ` — ${u.job_role}` : ""}
+                          {u.email}{u.job_role ? ` · ${u.job_role}` : ""}
                         </option>
                       ))}
                     </select>
