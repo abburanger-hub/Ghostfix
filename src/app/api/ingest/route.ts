@@ -28,6 +28,8 @@ interface IngestPayload {
   user_email: string;
   /** Optional — if provided, triggers real GitHub PR creation */
   team_id?: string;
+  /** Optional — the module selected by the user in the submit dialog */
+  failing_module?: string;
 }
 
 /** Shape of a row returned from the historical_fixes knowledge base */
@@ -299,6 +301,26 @@ interface RealPatchResult {
   can_fix: boolean;
 }
 
+/** Compute a simple unified-style diff from original vs patched file content. */
+function computeDiffPreview(original: string, patched: string, filePath: string): string {
+  const origLines = original.split("\n");
+  const patchLines = patched.split("\n");
+  const changedLines: string[] = [];
+
+  const maxLen = Math.max(origLines.length, patchLines.length);
+  for (let i = 0; i < maxLen && changedLines.length < 20; i++) {
+    const o = origLines[i];
+    const p = patchLines[i];
+    if (o !== p) {
+      if (o !== undefined) changedLines.push(`- ${o}`);
+      if (p !== undefined) changedLines.push(`+ ${p}`);
+    }
+  }
+
+  if (changedLines.length === 0) return "";
+  return `--- a/${filePath}\n+++ b/${filePath}\n${changedLines.join("\n")}`;
+}
+
 async function generateRealPatchWithAI(
   issueText: string,
   fileContent: string,
@@ -318,12 +340,11 @@ CRITICAL: Respond ONLY with valid JSON matching this exact schema:
 {
   "can_fix": <boolean — true if you can confidently identify and fix the bug>,
   "patched_content": "<complete new file content with the fix applied — FULL FILE, not just the changed part>",
-  "diff_preview": "<unified diff showing changed lines only, max 15 lines, format: -old line / +new line>",
   "changed_function": "<name of the function or method you changed, or 'config' if it was a config value>"
 }
 
 Rules:
-- If can_fix is false, patched_content and diff_preview can be empty strings
+- If can_fix is false, patched_content can be an empty string
 - Make ONLY the minimal change needed to fix the reported bug
 - The patched_content MUST be the complete file — do not truncate it
 - Preserve all existing formatting, indentation, and style`;
@@ -363,7 +384,7 @@ Generate the fix.`;
     return {
       can_fix: true,
       patched_content: parsed.patched_content,
-      diff_preview: parsed.diff_preview ?? "",
+      diff_preview: "", // computed by caller after we have both original + patched
       changed_function: parsed.changed_function ?? "unknown",
     };
   } catch (err) {
@@ -404,7 +425,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { issue_text, source, user_email, team_id } = payload;
+  const { issue_text, source, user_email, team_id, failing_module: payloadModule } = payload;
 
   if (!issue_text || typeof issue_text !== "string" || !issue_text.trim()) {
     void pendoTrack({
@@ -564,8 +585,11 @@ export async function POST(request: NextRequest) {
           repo_owner: string; repo_name: string; default_branch: string; github_pat: string;
         };
 
+        // Use the user-selected module from the payload if available (more reliable than AI inference)
+        const moduleForSearch = payloadModule?.trim() || triage.failing_module;
+
         // Find relevant source files by module name
-        const files = await findModuleFiles(github_pat, repo_owner, repo_name, triage.failing_module, default_branch);
+        const files = await findModuleFiles(github_pat, repo_owner, repo_name, moduleForSearch, default_branch);
 
         if (files.length > 0) {
           // Fetch the most relevant file's content
@@ -580,6 +604,9 @@ export async function POST(request: NextRequest) {
           );
 
           if (patch?.can_fix) {
+            // Compute the real diff from original vs patched content (never trust AI to generate diffs)
+            const diffPreview = computeDiffPreview(file.content, patch.patched_content, file.path);
+
             // Create branch + commit + PR on GitHub
             const pr = await createPullRequest({
               pat: github_pat,
@@ -594,7 +621,7 @@ export async function POST(request: NextRequest) {
               fixSummary: triage.fix_summary,
             });
             githubPrUrl = pr.url;
-            realPatchCode = patch.diff_preview;
+            realPatchCode = diffPreview || patch.diff_preview;
             console.log(`[GhostFix] ✓ GitHub PR created: ${pr.url}`);
           }
         }
