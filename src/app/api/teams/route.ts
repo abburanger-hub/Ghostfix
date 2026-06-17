@@ -27,7 +27,21 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json({ teams: teams ?? [] });
+
+    // Normalize: team_repos comes back as a single object (one-to-one via UNIQUE FK),
+    // but our client code expects team_repos to be an array.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const normalized = (teams ?? []).map((t: any) => ({
+      ...t,
+      team_repos: t.team_repos
+        ? Array.isArray(t.team_repos) ? t.team_repos : [t.team_repos]
+        : [],
+      team_members: t.team_members
+        ? Array.isArray(t.team_members) ? t.team_members : [t.team_members]
+        : [],
+    }));
+
+    return NextResponse.json({ teams: normalized });
   } catch (err) {
     console.error("[GhostFix] GET /api/teams:", err);
     return NextResponse.json({ error: "Failed to fetch teams." }, { status: 500 });
