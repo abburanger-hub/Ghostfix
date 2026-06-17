@@ -50,13 +50,27 @@ export async function findModuleFiles(
   failingModule: string,
   branch = "main",
 ): Promise<{ path: string; sha: string }[]> {
-  // Derive search keywords from module name
+  // Common English words that appear in bug reports but are not file/module identifiers
+  const NOISE_WORDS = new Set([
+    "with", "from", "that", "this", "have", "been", "they", "will", "would", "could",
+    "should", "after", "before", "about", "getting", "showing", "throwing", "every",
+    "even", "though", "very", "just", "still", "when", "then", "also", "both", "each",
+    "more", "some", "randomly", "failing", "working", "errors", "error", "issue",
+    "problem", "production", "started", "affected", "aborted", "operation", "fast",
+    "connections", "customers", "backend", "endpoint", "types", "confirmation",
+    "receiving", "charged", "transactions", "increase", "increased", "server", "load",
+    "last", "week", "clear", "cause", "logs", "show", "card", "even", "all",
+  ]);
+
+  // Derive search keywords from module name or issue text
   // "Payment Service" → ["payment", "service"]
+  // Filters noise words so issue-text fallback doesn't match on generic verbs
   const keywords = failingModule
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter((w) => w.length > 2);
+    .filter((w) => w.length > 3 && !NOISE_WORDS.has(w))
+    .slice(0, 6);
 
   const res = await fetch(
     `${GH}/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,

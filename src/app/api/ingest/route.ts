@@ -589,7 +589,14 @@ export async function POST(request: NextRequest) {
         const moduleForSearch = payloadModule?.trim() || triage.failing_module;
 
         // Find relevant source files by module name
-        const files = await findModuleFiles(github_pat, repo_owner, repo_name, moduleForSearch, default_branch);
+        let files = await findModuleFiles(github_pat, repo_owner, repo_name, moduleForSearch, default_branch);
+
+        // Fallback: if module name search found nothing, search using keywords from the issue text
+        // This handles cases where the AI guesses a wrong/generic module name
+        if (files.length === 0) {
+          console.log(`[GhostFix] Module search for "${moduleForSearch}" returned 0 files — falling back to issue text keywords`);
+          files = await findModuleFiles(github_pat, repo_owner, repo_name, issue_text.trim().slice(0, 200), default_branch);
+        }
 
         if (files.length > 0) {
           // Fetch the most relevant file's content
