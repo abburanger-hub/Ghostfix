@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import SubmitTicketDialog from "@/components/dashboard/submit-ticket-dialog";
 import { TeamFilterSelect } from "@/components/dashboard/team-filter-select";
+import { ModuleFilterSelect } from "@/components/dashboard/module-filter-select";
 import PendoDashboardTracker from "@/components/dashboard/pendo-tracker";
 import ScrollToHighlight from "@/components/dashboard/scroll-to-highlight";
 import Link from "next/link";
@@ -401,9 +402,9 @@ const PAGE_SIZE = 10;
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; highlight?: string; team?: string; view?: string }>;
+  searchParams: Promise<{ page?: string; highlight?: string; team?: string; view?: string; module?: string }>;
 }) {
-  const { page: pageParam, highlight, team: teamFilter, view } = await searchParams;
+  const { page: pageParam, highlight, team: teamFilter, view, module: moduleFilter } = await searchParams;
   const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   // ── Auth: get current user + admin check ──────────────────────────────────
@@ -424,6 +425,7 @@ export default async function DashboardPage({
   let fetchError = false;
   let isDemo = false;
   let allTeams: { id: string; name: string }[] = [];
+  let allModules: string[] = [];
 
   const hasRealKeys =
     process.env.SUPABASE_URL &&
@@ -471,6 +473,10 @@ export default async function DashboardPage({
         if (teamFilter) {
           q = q.eq("team_id", teamFilter);
         }
+        // Module filter
+        if (moduleFilter) {
+          q = q.eq("failing_module", moduleFilter);
+        }
         return q;
       }
 
@@ -513,6 +519,24 @@ export default async function DashboardPage({
       } else if (userTeamIds && userTeamIds.length > 0) {
         const { data: teamRows } = await supabase.from("teams").select("id, name").in("id", userTeamIds).order("name");
         allTeams = (teamRows ?? []) as { id: string; name: string }[];
+      }
+
+      // Fetch modules from connected repos for the relevant teams
+      {
+        const relevantTeamIds = teamFilter
+          ? [teamFilter]
+          : allTeams.map((t) => t.id);
+        if (relevantTeamIds.length > 0) {
+          const { data: repoRows } = await supabase
+            .from("team_repos")
+            .select("modules")
+            .in("team_id", relevantTeamIds);
+          const seen = new Set<string>();
+          (repoRows ?? []).forEach((r: { modules: string[] }) =>
+            (r.modules ?? []).forEach((m: string) => seen.add(m))
+          );
+          allModules = Array.from(seen).sort();
+        }
       }
     } catch {
       fetchError = true;
@@ -696,21 +720,28 @@ export default async function DashboardPage({
                 <CardDescription className="mt-0.5 text-xs">
                   {isAdmin
                     ? teamFilter
-                      ? `Showing tickets for: ${allTeams.find(t => t.id === teamFilter)?.name ?? "selected team"}`
-                      : "Admin view — all teams · all tickets"
-                    : "Your teams' tickets"}
+                      ? `Showing tickets for: ${allTeams.find(t => t.id === teamFilter)?.name ?? "selected team"}${moduleFilter ? ` · module: ${moduleFilter}` : ""}`
+                      : `Admin view — all teams · all tickets${moduleFilter ? ` · module: ${moduleFilter}` : ""}`
+                    : `Your teams' tickets${moduleFilter ? ` · module: ${moduleFilter}` : ""}`}
                 </CardDescription>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {/* Admin: team selector — auto-submits on change */}
+                {/* Team filter */}
                 {isAdmin && allTeams.length > 0 && (
                   <TeamFilterSelect teams={allTeams} defaultValue={teamFilter ?? ""} />
                 )}
-
-                {/* Non-admin: team filter if in multiple teams */}
                 {!isAdmin && allTeams.length > 1 && (
                   <TeamFilterSelect teams={allTeams} defaultValue={teamFilter ?? ""} />
+                )}
+
+                {/* Module filter — only shown when modules exist */}
+                {allModules.length > 0 && (
+                  <ModuleFilterSelect
+                    modules={allModules}
+                    defaultValue={moduleFilter ?? ""}
+                    isAdmin={isAdmin}
+                  />
                 )}
 
                 {/* Engine label */}
@@ -718,8 +749,7 @@ export default async function DashboardPage({
                   <Cpu className="size-3.5" />
                   <span>Llama 3.3 · Groq</span>
                 </div>
-              </div>
-            </div>
+              </div>            </div>
           </CardHeader>
 
           {/* Card body */}

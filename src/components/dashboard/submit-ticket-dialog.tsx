@@ -48,6 +48,7 @@ interface TeamOption {
   id: string;
   name: string;
   has_repo: boolean;
+  modules: string[];
 }
 
 type Phase =
@@ -447,19 +448,24 @@ export default function SubmitTicketDialog({
   const [email, setEmail] = useState("");
   const [issueText, setIssueText] = useState("");
   const [teamId, setTeamId] = useState("");
+  const [moduleSelected, setModuleSelected] = useState("");
   const [teams, setTeams] = useState<TeamOption[]>([]);
+
+  const selectedTeam = teams.find((t) => t.id === teamId);
+  const teamModules = selectedTeam?.modules ?? [];
 
   // Fetch teams when dialog opens
   useEffect(() => {
     if (!open) return;
     fetch("/api/teams")
       .then((r) => r.json())
-      .then((data: { teams?: { id: string; name: string; team_repos?: unknown[] }[] }) => {
+      .then((data: { teams?: { id: string; name: string; team_repos?: { modules?: string[] }[] }[] }) => {
         setTeams(
           (data.teams ?? []).map((t) => ({
             id: t.id,
             name: t.name,
             has_repo: Array.isArray(t.team_repos) && t.team_repos.length > 0,
+            modules: t.team_repos?.[0]?.modules ?? [],
           })),
         );
       })
@@ -476,6 +482,7 @@ export default function SubmitTicketDialog({
     setIssueText("");
     setSource("Web Form");
     setTeamId("");
+    setModuleSelected("");
   }
 
   function handleClose(openState: boolean) {
@@ -520,6 +527,7 @@ export default function SubmitTicketDialog({
           user_email: email.trim(),
           issue_text: issueText.trim(),
           ...(teamId ? { team_id: teamId } : {}),
+          ...(moduleSelected ? { failing_module: moduleSelected } : {}),
         }),
         signal: abortRef.current.signal,
       });
@@ -731,7 +739,7 @@ export default function SubmitTicketDialog({
                   <select
                     id="team"
                     value={teamId}
-                    onChange={(e) => setTeamId(e.target.value)}
+                    onChange={(e) => { setTeamId(e.target.value); setModuleSelected(""); }}
                     className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
                   >
                     <option value="" className="bg-card text-foreground">No team — standard triage</option>
@@ -741,12 +749,34 @@ export default function SubmitTicketDialog({
                       </option>
                     ))}
                   </select>
-                  {teamId && teams.find((t) => t.id === teamId)?.has_repo && (
+                  {selectedTeam?.has_repo && (
                     <p className="flex items-center gap-1 text-[10px] text-emerald-400/70">
                       <GitBranch className="size-3" />
                       GhostFix will open a real pull request on your GitHub repo.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* Module selector — appears when team has modules configured */}
+              {teamId && teamModules.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="module" className="text-xs text-muted-foreground">
+                    Affected Module
+                  </Label>
+                  <select
+                    id="module"
+                    value={moduleSelected}
+                    onChange={(e) => setModuleSelected(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                    required
+                  >
+                    <option value="" className="bg-card text-foreground">Select module…</option>
+                    {teamModules.map((m) => (
+                      <option key={m} value={m} className="bg-card text-foreground">{m}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-muted-foreground/50">GhostFix will target this module&apos;s source files for AI patching.</p>
                 </div>
               )}
 
