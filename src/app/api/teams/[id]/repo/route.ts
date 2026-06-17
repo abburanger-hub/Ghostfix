@@ -45,20 +45,25 @@ export async function POST(
     }
 
     const supabase = createServerSupabaseClient();
-    const { error } = await supabase.from("team_repos").upsert(
-      {
+
+    // Delete existing row first (more reliable than upsert for UNIQUE-on-column constraints)
+    await supabase.from("team_repos").delete().eq("team_id", id);
+
+    const { data: inserted, error } = await supabase
+      .from("team_repos")
+      .insert({
         team_id: id,
         repo_owner: repo_owner.trim(),
         repo_name: repo_name.trim(),
         default_branch,
         github_pat: github_pat.trim(),
         modules: modules ?? [],
-      },
-      { onConflict: "team_id" },
-    );
+      })
+      .select("id, repo_owner, repo_name, default_branch, modules, created_at")
+      .single();
 
     if (error) throw error;
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json({ ok: true, repo: inserted }, { status: 201 });
   } catch (err) {
     console.error("[GhostFix] POST /api/teams/[id]/repo:", err);
     return NextResponse.json({ error: "Failed to connect repo." }, { status: 500 });

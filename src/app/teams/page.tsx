@@ -7,7 +7,7 @@
 // No auth needed — owner email is pre-filled from localStorage.
 // =============================================================================
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Ghost, Users, GitBranch, Plus, Trash2, ChevronDown, ChevronUp,
@@ -172,20 +172,25 @@ function TeamCard({
   const [repoOk, setRepoOk] = useState(false);
 
   // localRepo: optimistic — set immediately on successful connect so the
-  // header badge shows right away (before parent re-fetch completes).
-  // IMPORTANT: never clear localRepo from a parent re-render that returns
-  // empty team_repos (race condition vs. DB write). Only update when confirmed data arrives.
+  // localRepo: truth source for the header badge.
+  // Initialized from parent data, updated from confirmed API response.
+  // NEVER cleared by a parent re-render — parent may re-fetch before Supabase
+  // flushes the write and momentarily return empty team_repos.
   const [localRepo, setLocalRepo] = useState<TeamRepo | undefined>(team.team_repos?.[0]);
+  const confirmedRef = React.useRef(false); // true once we have server-confirmed repo
+
   useEffect(() => {
     const r = team.team_repos?.[0];
     if (r) {
-      // Parent has confirmed repo data — sync everything
+      // Parent returned real data — always safe to sync
       setLocalRepo(r);
+      confirmedRef.current = true;
       setRepoOwner(r.repo_owner);
       setRepoName(r.repo_name);
       setBranch(r.default_branch);
       setModulesRaw((r.modules ?? []).join(", "));
     }
+    // If r is undefined but we have confirmed repo data, keep localRepo — don't wipe it
   }, [team.team_repos]);
 
   const repo = localRepo;
@@ -234,20 +239,21 @@ function TeamCard({
           modules,
         }),
       });
-      const data = await res.json() as { error?: string };
+      const data = await res.json() as { ok?: boolean; repo?: TeamRepo; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to connect repo");
-      // Optimistically mark as connected — visible immediately in header
-      setLocalRepo({
-        id: "pending",
-        repo_owner: repoOwner.trim(),
-        repo_name: repoName.trim(),
-        default_branch: branch.trim() || "main",
-        modules,
-        created_at: new Date().toISOString(),
-      });
+      // Use the confirmed row returned by the API (actual DB data, not optimistic)
+      if (data.repo) {
+        setLocalRepo(data.repo);
+        confirmedRef.current = true;
+        setRepoOwner(data.repo.repo_owner);
+        setRepoName(data.repo.repo_name);
+        setBranch(data.repo.default_branch);
+        setModulesRaw((data.repo.modules ?? []).join(", "));
+      }
       setRepoOk(true);
       setTimeout(() => setRepoOk(false), 3000);
-      onUpdated();
+      // Delay parent re-fetch slightly to let DB flush the write
+      setTimeout(() => onUpdated(), 800);
     } catch (err) {
       setRepoError(err instanceof Error ? err.message : "Error");
     } finally { setRepoLoading(false); }
