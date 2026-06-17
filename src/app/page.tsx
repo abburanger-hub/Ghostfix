@@ -132,7 +132,7 @@ const STEPS = [
     num: "03",
     icon: <Ghost className="size-6 text-emerald-400" />,
     title: "Ghost Environment",
-    description: "A live, isolated hotfix environment is provisioned instantly. Users test the fix immediately — no waiting for production deploys.",
+    description: "A live, isolated hotfix environment is provisioned instantly. Users test the fix immediately no waiting for production deploys.",
     borderBg: "border-emerald-500/30 bg-emerald-500/5",
     numColor: "text-emerald-500/30",
   },
@@ -145,21 +145,21 @@ const FEATURES = [
   {
     icon: <BookOpen className="size-5 text-violet-400" />,
     title: "Gets Smarter Over Time",
-    description: "Every fix your team resolves is added to the knowledge base. GhostFix uses RAG to find past resolutions before calling the AI — repeat issues solved instantly.",
+    description: "Every fix your team resolves is added to the knowledge base. GhostFix uses RAG to find past resolutions before calling the AI repeat issues solved instantly.",
     border: "border-violet-500/20",
     bg: "bg-violet-500/[0.03]",
   },
   {
     icon: <AlertTriangle className="size-5 text-amber-400" />,
     title: "Intelligent Escalation",
-    description: "When AI confidence is too low, GhostFix escalates to the right engineering team — with full context, a 4-hour SLA target, and a one-click resolve flow.",
+    description: "When AI confidence is too low, GhostFix escalates to the right engineering team with full context, a 4-hour SLA target, and a one-click resolve flow.",
     border: "border-amber-500/20",
     bg: "bg-amber-500/[0.03]",
   },
   {
     icon: <Activity className="size-5 text-emerald-400" />,
     title: "Real-Time Dashboard",
-    description: "Every ticket tracked live. Status badges, AI module identification, fix summaries, ghost environment links, and pagination — all in one command center.",
+    description: "Every ticket tracked live. Status badges, AI module identification, fix summaries, ghost environment links, and pagination all in one command center.",
     border: "border-emerald-500/20",
     bg: "bg-emerald-500/[0.03]",
   },
@@ -225,7 +225,7 @@ export default async function LandingPage() {
               </span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Submit a bug. GhostFix AI identifies the root cause, searches your team&apos;s fix history, and provisions a live hotfix environment —{" "}
+              Submit a bug. GhostFix AI identifies the root cause, searches your team&apos;s fix history, and provisions a live hotfix environment {" "}
               <span className="font-semibold text-foreground">in seconds, not hours.</span>
             </p>
             <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
